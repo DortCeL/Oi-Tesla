@@ -75,3 +75,16 @@ export async function loginPassenger(input: PassengerLoginInput) {
   const token = signAuthToken({ sub: user.id, role: user.role });
   return { token, user: toPassengerResponse(user) };
 }
+
+export async function getPassengerProfile(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: passengerInclude,
+  });
+
+  if (!user || user.role !== Role.PASSENGER || !user.passenger) {
+    throw new AppError(404, "Passenger not found");
+  }
+
+  return toPassengerResponse(user);
+}
