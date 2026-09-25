@@ -1,0 +1,224 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  DRIVER
+  PASSENGER
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+enum RideType {
+  SOLO
+  SHARED
+}
+
+enum RideStatus {
+  WAITING
+  MATCHED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum RequestStatus {
+  REQUESTED
+  MATCHED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  TESLAPAY
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  phone        String   @unique
+  passwordHash String   @map("password_hash")
+  role         Role
+  gender       Gender
+  hobbies      String[] @default([])
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  driver     Driver?
+  passenger  Passenger?
+  rideEvents RideEvent[]
+
+  @@map("users")
+}
+
+model Driver {
+  userId   String  @id @map("user_id")
+  user     User    @relation(fields: [userId], references: [id])
+  isOnline Boolean @default(false) @map("is_online")
+
+  teslas Tesla[]
+  rides  Ride[]
+
+  @@map("drivers")
+}
+
+model Passenger {
+  userId        String  @id @map("user_id")
+  user          User    @relation(fields: [userId], references: [id])
+  addressZoneId Int     @map("address_zone_id")
+  addressZone   Zone    @relation(fields: [addressZoneId], references: [id])
+  occupation    String
+  affiliation   String? // company / school / university, free text
+
+  rideRequests RideRequest[]
+
+  @@map("passengers")
+}
+
+// vehicle
+model Tesla {
+  id       String  @id @default(uuid())
+  driverId String  @map("driver_id")
+  driver   Driver  @relation(fields: [driverId], references: [userId])
+  name     String
+  capacity Int     @default(3)
+  isActive Boolean @default(true) @map("is_active")
+
+  rides Ride[]
+
+  @@map("teslas")
+}
+
+model Zone {
+  id   Int     @id @default(autoincrement())
+  name String  @unique
+  lat  Decimal @db.Decimal(9, 6)
+  lng  Decimal @db.Decimal(9, 6)
+
+  passengersLivingHere    Passenger[]
+  ridesPickingUpHere      Ride[]        @relation("RidePickupZone")
+  requestsPickingUpHere   RideRequest[] @relation("RequestPickupZone")
+  requestsDroppingOffHere RideRequest[] @relation("RequestDestinationZone")
+
+  distancesFrom ZoneDistance[] @relation("DistanceFrom")
+  distancesTo   ZoneDistance[] @relation("DistanceTo")
+
+  @@map("zones")
+}
+
+// Full distance matrix between zones, in meters. Seed both directions.
+// Used for fare calculation AND for computing whether a destination is
+// "on the way" (triangle-inequality check) instead of hardcoding corridors.
+model ZoneDistance {
+  fromZoneId Int  @map("from_zone_id")
+  toZoneId   Int  @map("to_zone_id")
+  fromZone   Zone @relation("DistanceFrom", fields: [fromZoneId], references: [id])
+  toZone     Zone @relation("DistanceTo", fields: [toZoneId], references: [id])
+  distanceM  Int  @map("distance_m")
+
+  @@id([fromZoneId, toZoneId])
+  @@map("zone_distances")
+}
+
+// One trip taken by one Tesla. Several RideRequests can attach to one Ride
+// (pooling). type=SOLO rides never accept a second request.
+model Ride {
+  id           String     @id @default(uuid())
+  teslaId      String     @map("tesla_id")
+  tesla        Tesla      @relation(fields: [teslaId], references: [id])
+  driverId     String     @map("driver_id")
+  driver       Driver     @relation(fields: [driverId], references: [userId])
+  pickupZoneId Int        @map("pickup_zone_id")
+  pickupZone   Zone       @relation("RidePickupZone", fields: [pickupZoneId], references: [id])
+  type         RideType
+  status       RideStatus @default(WAITING)
+  capacity     Int
+  seatsTaken   Int        @default(0) @map("seats_taken")
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  startedAt   DateTime? @map("started_at")
+  completedAt DateTime? @map("completed_at")
+
+  requests RideRequest[]
+  events   RideEvent[]
+
+  @@index([pickupZoneId, status])
+  @@map("rides")
+}
+
+// One passenger's (or 2-friend group's) booking. seatsRequested is 1 or 2 —
+// a "passenger" can be a party of two booking together, leaving whatever
+// seats remain (up to tesla.capacity) open to other SHARED requests.
+model RideRequest {
+  id                  String        @id @default(uuid())
+  passengerId         String        @map("passenger_id")
+  passenger           Passenger     @relation(fields: [passengerId], references: [userId])
+  rideId              String?       @map("ride_id")
+  ride                Ride?         @relation(fields: [rideId], references: [id])
+  pickupZoneId        Int           @map("pickup_zone_id")
+  pickupZone          Zone          @relation("RequestPickupZone", fields: [pickupZoneId], references: [id])
+  destinationZoneId   Int           @map("destination_zone_id")
+  destinationZone     Zone          @relation("RequestDestinationZone", fields: [destinationZoneId], references: [id])
+  seatsRequested      Int           @default(1) @map("seats_requested")
+  type                RideType
+  status              RequestStatus @default(REQUESTED)
+
+  baseFarePaisa       Int @map("base_fare_paisa")
+  distanceChargePaisa Int @map("distance_charge_paisa")
+  poolDiscountPaisa   Int @map("pool_discount_paisa")
+  farePaisa           Int @map("fare_paisa")
+
+  paymentMethod PaymentMethod @default(CASH) @map("payment_method")
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  cancelledAt DateTime? @map("cancelled_at")
+
+  payment Payment?
+  events  RideEvent[]
+
+  @@index([status, pickupZoneId])
+  @@index([passengerId, createdAt(sort: Desc)])
+  @@map("ride_requests")
+}
+
+model Payment {
+  id            String        @id @default(uuid())
+  rideRequestId String        @unique @map("ride_request_id")
+  rideRequest   RideRequest   @relation(fields: [rideRequestId], references: [id])
+  method        PaymentMethod
+  amountPaisa   Int           @map("amount_paisa")
+  status        String        @default("PENDING")
+  createdAt     DateTime      @default(now()) @map("created_at")
+
+  @@map("payments")
+}
+
+// Insert-only audit trail of every status transition, for both rides and
+// individual requests. This is what powers the driver's ride history view.
+model RideEvent {
+  id            BigInt       @id @default(autoincrement())
+  rideId        String       @map("ride_id")
+  ride          Ride         @relation(fields: [rideId], references: [id])
+  rideRequestId String?      @map("ride_request_id")
+  rideRequest   RideRequest? @relation(fields: [rideRequestId], references: [id])
+  fromStatus    String       @map("from_status")
+  toStatus      String       @map("to_status")
+  actorUserId   String       @map("actor_user_id")
+  actor         User         @relation(fields: [actorUserId], references: [id])
+  note          String?
+  createdAt     DateTime     @default(now()) @map("created_at")
+
+  @@index([rideId, createdAt])
+  @@index([rideRequestId, createdAt])
+  @@map("ride_events")
+}
