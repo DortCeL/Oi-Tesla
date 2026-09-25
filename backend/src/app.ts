@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import { apiRouter } from "./routes/index.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
 export function createApp() {
@@ -12,6 +13,7 @@ export function createApp() {
     res.json({ status: "ok" });
   });
 
+  app.use("/api", apiRouter);
   app.use(errorHandler);
 
   return app;
