@@ -11,4 +11,10 @@ export const passengerRegisterSchema = z.object({
   affiliation: z.string().trim().min(1).max(200).optional(),
 });
 
+export const passengerLoginSchema = z.object({
+  emailOrPhone: z.string().trim().min(1),
+  password: z.string().min(1),
+});
+
 export type PassengerRegisterInput = z.infer<typeof passengerRegisterSchema>;
+export type PassengerLoginInput = z.infer<typeof passengerLoginSchema>;

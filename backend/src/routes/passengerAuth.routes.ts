@@ -1,6 +1,10 @@
 import { Router } from "express";
-import { registerPassengerHandler } from "../controllers/passengerAuth.controller.js";
+import {
+  loginPassengerHandler,
+  registerPassengerHandler,
+} from "../controllers/passengerAuth.controller.js";
 
 export const passengerAuthRouter = Router();
 
 passengerAuthRouter.post("/register", registerPassengerHandler);
+passengerAuthRouter.post("/login", loginPassengerHandler);

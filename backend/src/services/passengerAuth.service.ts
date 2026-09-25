@@ -1,10 +1,13 @@
 import { Prisma, Role } from "@prisma/client";
 import { prisma } from "../db/prisma.js";
 import { AppError } from "../middleware/errorHandler.js";
-import { hashPassword } from "../utils/password.js";
+import { hashPassword, verifyPassword } from "../utils/password.js";
 import { signAuthToken } from "../utils/jwt.js";
 import { toPassengerResponse } from "../utils/passengerMapper.js";
-import type { PassengerRegisterInput } from "../validators/passengerAuth.validator.js";
+import type {
+  PassengerLoginInput,
+  PassengerRegisterInput,
+} from "../validators/passengerAuth.validator.js";
 
 const passengerInclude = {
   passenger: { include: { addressZone: true } },
@@ -47,6 +50,27 @@ export async function registerPassenger(input: PassengerRegisterInput) {
     },
     include: passengerInclude,
   });
+
+  const token = signAuthToken({ sub: user.id, role: user.role });
+  return { token, user: toPassengerResponse(user) };
+}
+
+export async function loginPassenger(input: PassengerLoginInput) {
+  const user = await prisma.user.findFirst({
+    where: {
+      OR: [{ email: input.emailOrPhone }, { phone: input.emailOrPhone }],
+    },
+    include: passengerInclude,
+  });
+
+  if (!user || user.role !== Role.PASSENGER || !user.passenger) {
+    throw new AppError(401, "Invalid email/phone or password");
+  }
+
+  const valid = await verifyPassword(input.password, user.passwordHash);
+  if (!valid) {
+    throw new AppError(401, "Invalid email/phone or password");
+  }
 
   const token = signAuthToken({ sub: user.id, role: user.role });
   return { token, user: toPassengerResponse(user) };

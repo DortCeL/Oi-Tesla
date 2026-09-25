@@ -1,6 +1,12 @@
 import type { NextFunction, Request, Response } from "express";
-import { registerPassenger } from "../services/passengerAuth.service.js";
-import { passengerRegisterSchema } from "../validators/passengerAuth.validator.js";
+import {
+  loginPassenger,
+  registerPassenger,
+} from "../services/passengerAuth.service.js";
+import {
+  passengerLoginSchema,
+  passengerRegisterSchema,
+} from "../validators/passengerAuth.validator.js";
 
 export async function registerPassengerHandler(
   req: Request,
@@ -11,6 +17,20 @@ export async function registerPassengerHandler(
     const input = passengerRegisterSchema.parse(req.body);
     const result = await registerPassenger(input);
     res.status(201).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function loginPassengerHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const input = passengerLoginSchema.parse(req.body);
+    const result = await loginPassenger(input);
+    res.json(result);
   } catch (err) {
     next(err);
   }
