@@ -69,3 +69,16 @@ export async function loginDriver(input: DriverLoginInput) {
   const token = signAuthToken({ sub: user.id, role: user.role });
   return { token, user: toDriverResponse(user) };
 }
+
+export async function getDriverProfile(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: driverInclude,
+  });
+
+  if (!user || user.role !== Role.DRIVER || !user.driver) {
+    throw new AppError(404, "Driver not found");
+  }
+
+  return toDriverResponse(user);
+}
