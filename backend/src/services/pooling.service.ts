@@ -2,8 +2,9 @@
  * Matches a passenger ride_request to a Tesla ride after booking.
  *
  * Flow (called from rideRequest.service after create):
- *   SOLO   → always start a new ride (never pool)
- *   SHARED → try join an existing WAITING ride at same pickup, else start new
+ *   SOLO   → always start a new ride (never pool); ride locks immediately (MATCHED)
+ *   SHARED → try join an existing WAITING ride at same pickup, else start new;
+ *            ride locks (MATCHED) when seatsTaken === capacity
  *   no online driver → return unmatched (status stays REQUESTED)
  */
 import {
@@ -68,6 +69,47 @@ async function loadDistanceLookup(
   return buildDistanceLookup(rows);
 }
 
+/** SOLO locks on match; SHARED locks only when every seat is taken. */
+function resolveRideStatusAfterAttach(
+  type: RideType,
+  capacity: number,
+  seatsTaken: number,
+): RideStatus {
+  if (type === RideType.SOLO) {
+    return RideStatus.MATCHED;
+  }
+
+  return seatsTaken >= capacity ? RideStatus.MATCHED : RideStatus.WAITING;
+}
+
+/** Flip ride WAITING → MATCHED when lock rules say the ride is sealed. */
+async function maybeLockRide(
+  tx: Prisma.TransactionClient,
+  rideId: string,
+) {
+  const ride = await tx.ride.findUnique({
+    where: { id: rideId },
+    select: { type: true, capacity: true, seatsTaken: true, status: true },
+  });
+
+  if (!ride || ride.status !== RideStatus.WAITING) {
+    return;
+  }
+
+  const nextStatus = resolveRideStatusAfterAttach(
+    ride.type,
+    ride.capacity,
+    ride.seatsTaken,
+  );
+
+  if (nextStatus !== ride.status) {
+    await tx.ride.update({
+      where: { id: rideId },
+      data: { status: nextStatus },
+    });
+  }
+}
+
 /** Pool onto an existing ride: bump seatsTaken and link the request. */
 async function attachRequestToRide(
   tx: Prisma.TransactionClient,
@@ -79,6 +121,8 @@ async function attachRequestToRide(
     where: { id: rideId },
     data: { seatsTaken: { increment: seatsRequested } },
   });
+
+  await maybeLockRide(tx, rideId);
 
   return tx.rideRequest.update({
     where: { id: requestId },
@@ -131,7 +175,11 @@ async function createRideAndAttach(
       driverId: driver.userId,
       pickupZoneId: request.pickupZoneId,
       type: request.type,
-      status: RideStatus.WAITING,
+      status: resolveRideStatusAfterAttach(
+        request.type,
+        tesla.capacity,
+        request.seatsRequested,
+      ),
       capacity: tesla.capacity,
       seatsTaken: request.seatsRequested,
     },
