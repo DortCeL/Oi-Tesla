@@ -6,9 +6,9 @@ export const passengerRegisterSchema = z.object({
   phone: z.string().trim().min(10).max(20),
   password: z.string().min(8).max(128),
   gender: z.enum(["MALE", "FEMALE"]),
-  addressZoneId: z.number().int().positive(),
-  occupation: z.string().trim().min(1).max(100),
+  occupation: z.string().trim().min(1).max(100).optional(),
   affiliation: z.string().trim().min(1).max(200).optional(),
+  hobbies: z.array(z.string().trim().min(1).max(50)).max(10).optional(),
 });
 
 export const passengerLoginSchema = z.object({

@@ -8,13 +8,10 @@ type PassengerUser = {
   role: Role;
   gender: Gender;
   createdAt: Date;
+  hobbies: string[];
   passenger: {
-    occupation: string;
+    occupation: string | null;
     affiliation: string | null;
-    addressZone: {
-      id: number;
-      name: string;
-    };
   } | null;
 };
 
@@ -26,12 +23,12 @@ export function toPassengerResponse(user: PassengerUser) {
     phone: user.phone,
     role: user.role,
     gender: user.gender,
+    hobbies: user.hobbies,
     createdAt: user.createdAt,
     passenger: user.passenger
       ? {
           occupation: user.passenger.occupation,
           affiliation: user.passenger.affiliation,
-          addressZone: user.passenger.addressZone,
         }
       : null,
   };

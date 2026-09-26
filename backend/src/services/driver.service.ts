@@ -17,10 +17,27 @@ export async function setDriverOnlineStatus(
     throw new AppError(404, "Driver not found");
   }
 
-  if (driver.isOnline !== input.isOnline) {
+  if (input.isOnline) {
+    const zones = await prisma.zone.findMany({
+      where: { id: { in: input.zoneIds ?? [] } },
+      select: { id: true },
+    });
+
+    if (zones.length !== (input.zoneIds?.length ?? 0)) {
+      throw new AppError(400, "One or more zones are invalid");
+    }
+
     await prisma.driver.update({
       where: { userId },
-      data: { isOnline: input.isOnline },
+      data: {
+        isOnline: true,
+        activeZoneIds: input.zoneIds ?? [],
+      },
+    });
+  } else if (driver.isOnline) {
+    await prisma.driver.update({
+      where: { userId },
+      data: { isOnline: false },
     });
   }
 

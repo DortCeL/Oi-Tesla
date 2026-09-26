@@ -10,18 +10,10 @@ import type {
 } from "../validators/passengerAuth.validator.js";
 
 const passengerInclude = {
-  passenger: { include: { addressZone: true } },
+  passenger: true,
 } satisfies Prisma.UserInclude;
 
 export async function registerPassenger(input: PassengerRegisterInput) {
-  const zone = await prisma.zone.findUnique({
-    where: { id: input.addressZoneId },
-  });
-
-  if (!zone) {
-    throw new AppError(400, "Invalid address zone");
-  }
-
   const existing = await prisma.user.findFirst({
     where: { OR: [{ email: input.email }, { phone: input.phone }] },
   });
@@ -40,9 +32,9 @@ export async function registerPassenger(input: PassengerRegisterInput) {
       passwordHash,
       role: Role.PASSENGER,
       gender: input.gender,
+      hobbies: input.hobbies ?? [],
       passenger: {
         create: {
-          addressZoneId: input.addressZoneId,
           occupation: input.occupation,
           affiliation: input.affiliation,
         },

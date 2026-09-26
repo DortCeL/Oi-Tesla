@@ -169,6 +169,7 @@ async function createRideAndAttach(
   const driver = await tx.driver.findFirst({
     where: {
       isOnline: true,
+      activeZoneIds: { has: request.pickupZoneId },
       teslas: {
         some: {
           isActive: true,
@@ -250,7 +251,10 @@ async function tryJoinSharedRide(
       pickupZoneId: request.pickupZoneId,
       type: RideType.SHARED,
       status: RideStatus.WAITING,
-      driver: { isOnline: true },
+      driver: {
+        isOnline: true,
+        activeZoneIds: { has: request.pickupZoneId },
+      },
       tesla: { isActive: true },
     },
     include: {
