@@ -2,6 +2,7 @@ import { Router } from "express";
 import { Role } from "@prisma/client";
 import { requireAuth } from "../middleware/auth.js";
 import {
+  cancelRideRequestHandler,
   createRideRequestHandler,
   estimateRideRequestHandler,
 } from "../controllers/rideRequest.controller.js";
@@ -17,4 +18,9 @@ rideRequestRouter.post(
   "/",
   requireAuth([Role.PASSENGER]),
   createRideRequestHandler,
+);
+rideRequestRouter.post(
+  "/:id/cancel",
+  requireAuth([Role.PASSENGER]),
+  cancelRideRequestHandler,
 );
