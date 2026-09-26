@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../db/prisma.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { calculateFare } from "../utils/fare.js";
+import { tryMatchRideRequest } from "./pooling.service.js";
 import { toRideRequestResponse } from "../utils/rideRequestMapper.js";
 import type {
   RideRequestCreateInput,
@@ -79,8 +80,15 @@ export async function createRideRequest(
       poolDiscountPaisa: fare.poolDiscountPaisa,
       farePaisa: fare.farePaisa,
     },
-    include: rideRequestInclude,
   });
 
-  return toRideRequestResponse(request);
+  const matched = await tryMatchRideRequest(request.id);
+  const finalRequest =
+    matched ??
+    (await prisma.rideRequest.findUniqueOrThrow({
+      where: { id: request.id },
+      include: rideRequestInclude,
+    }));
+
+  return toRideRequestResponse(finalRequest);
 }
