@@ -18,11 +18,15 @@ const ZONES = [
   { name: "Bashundhara", lat: "23.815900", lng: "90.424700" },
 ] as const;
 
-// Distances in meters — round numbers, hand-testable for fare calc
+// Distances in meters — round numbers, hand-testable for fare calc.
+//
+// PRD corridor (Banani pickup, rush-hour story):
+//   Banani ──2 km── Mohakhali (Nusrat) ──2 km── Gulshan 1 (Rafiq)
+// Nusrat books first → Mohakhali; Rafiq joins same pool → Gulshan 1.
 const DISTANCES: Record<string, Record<string, number>> = {
   Banani: {
-    "Gulshan 1": 1500,
-    Mohakhali: 2500,
+    "Gulshan 1": 4000,
+    Mohakhali: 2000,
     Dhanmondi: 4500,
     Mirpur: 6000,
     Uttara: 8500,
@@ -30,7 +34,7 @@ const DISTANCES: Record<string, Record<string, number>> = {
     Bashundhara: 3000,
   },
   "Gulshan 1": {
-    Banani: 1500,
+    Banani: 4000,
     Mohakhali: 2000,
     Dhanmondi: 5000,
     Mirpur: 6500,
@@ -39,7 +43,7 @@ const DISTANCES: Record<string, Record<string, number>> = {
     Bashundhara: 2500,
   },
   Mohakhali: {
-    Banani: 2500,
+    Banani: 2000,
     "Gulshan 1": 2000,
     Dhanmondi: 3500,
     Mirpur: 5500,

@@ -50,8 +50,12 @@ function buildDistanceLookup(
     map.set(`${row.fromZoneId}-${row.toZoneId}`, row.distanceM);
   }
 
-  return (fromZoneId, toZoneId) =>
-    map.get(`${fromZoneId}-${toZoneId}`) ?? null;
+  return (fromZoneId, toZoneId) => {
+    if (fromZoneId === toZoneId) {
+      return 0;
+    }
+    return map.get(`${fromZoneId}-${toZoneId}`) ?? null;
+  };
 }
 
 /** Load all pairwise distances between the given zones (one query per candidate ride). */

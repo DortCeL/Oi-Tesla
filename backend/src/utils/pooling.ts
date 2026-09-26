@@ -14,8 +14,8 @@ export function hasEnoughSeats(  capacity: number,
  * For each passenger already on the ride, the new stop must lie on the same
  * corridor: dist(pickup, existing) + dist(existing, new) <= dist(pickup, new).
  *
- * Example: Nusrat Banani→Mohakhali first, then Rafiq Banani→Gulshan can join
- * if Mohakhali is on the way to Gulshan. The reverse order may fail.
+ * Example (PRD): Nusrat Banani→Mohakhali first, then Rafiq Banani→Gulshan 1
+ * can join — Mohakhali lies on the Banani→Gulshan corridor. Reverse order fails.
  */
 export function isDestinationCompatible(
   dist: DistanceLookup,
