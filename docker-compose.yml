@@ -34,10 +34,14 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:3001
     container_name: dtp-web
     restart: unless-stopped
     environment:
-      - VITE_API_URL=http://localhost:3001
+      PORT: "3000"
+      # Browser calls (baked at build via VITE_API_URL); SSR loaders use internal service name.
+      API_URL: http://api:3001
     ports:
       - "3000:3000"
     depends_on:
