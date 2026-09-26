@@ -1,0 +1,98 @@
+import request from "supertest";
+import { createApp } from "../src/app.js";
+import { prisma } from "../src/db/prisma.js";
+
+export const app = createApp();
+export const DEMO_PASSWORD = "password123";
+
+export async function login(
+  emailOrPhone: string,
+  password = DEMO_PASSWORD,
+): Promise<string> {
+  const rolePath = emailOrPhone.includes("jashim") ? "driver" : "passenger";
+  const res = await request(app)
+    .post(`/api/auth/${rolePath}/login`)
+    .send({ emailOrPhone, password });
+
+  if (res.status !== 200) {
+    throw new Error(`Login failed for ${emailOrPhone}: ${res.status} ${res.text}`);
+  }
+
+  return res.body.token as string;
+}
+
+export async function setDriverOnline(token: string, isOnline = true) {
+  const res = await request(app)
+    .patch("/api/driver/status")
+    .set("Authorization", `Bearer ${token}`)
+    .send({ isOnline });
+
+  if (res.status !== 200) {
+    throw new Error(`setDriverOnline failed: ${res.status} ${res.text}`);
+  }
+}
+
+export async function createRideRequest(
+  token: string,
+  body: {
+    pickupZoneId: number;
+    destinationZoneId: number;
+    type: "SOLO" | "SHARED";
+    seatsRequested: 1 | 2;
+    paymentMethod: "CASH" | "TESLAPAY";
+  },
+) {
+  return request(app)
+    .post("/api/ride-requests")
+    .set("Authorization", `Bearer ${token}`)
+    .send(body);
+}
+
+export async function getZoneId(name: string): Promise<number> {
+  const zone = await prisma.zone.findFirst({ where: { name } });
+  if (!zone) {
+    throw new Error(`Zone not found: ${name}`);
+  }
+  return zone.id;
+}
+
+export async function cleanupRides(rideIds: string[]) {
+  if (rideIds.length === 0) {
+    return;
+  }
+
+  await prisma.rideEvent.deleteMany({ where: { rideId: { in: rideIds } } });
+  await prisma.payment.deleteMany({
+    where: { rideRequest: { rideId: { in: rideIds } } },
+  });
+  await prisma.rideRequest.deleteMany({ where: { rideId: { in: rideIds } } });
+  await prisma.ride.deleteMany({ where: { id: { in: rideIds } } });
+}
+
+/** Wipe all demo-app rides so tests start from a clean pool state. */
+export async function cleanupAllDemoRides() {
+  const demoEmails = [
+    "jashim@oitesla.test",
+    "nusrat@oitesla.test",
+    "rafiq@oitesla.test",
+    "shirin@oitesla.test",
+  ];
+
+  const rideIds = (
+    await prisma.ride.findMany({
+      where: {
+        OR: [
+          { driver: { user: { email: "jashim@oitesla.test" } } },
+          {
+            requests: {
+              some: { passenger: { user: { email: { in: demoEmails } } } },
+            },
+          },
+        ],
+      },
+      select: { id: true },
+    })
+  ).map((ride) => ride.id);
+
+  await cleanupRides(rideIds);
+}
