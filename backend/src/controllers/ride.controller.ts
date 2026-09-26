@@ -2,6 +2,8 @@ import type { NextFunction, Request, Response } from "express";
 import { AppError } from "../middleware/errorHandler.js";
 import {
   completeRide,
+  getDriverRideDetail,
+  listDriverRides,
   markDriverArrival,
   startRide,
 } from "../services/ride.service.js";
@@ -12,6 +14,42 @@ function getRideIdParam(req: Request): string {
     throw new AppError(400, "Invalid ride id");
   }
   return rideId;
+}
+
+export async function listDriverRidesHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    if (!req.user) {
+      next(new AppError(401, "Unauthorized"));
+      return;
+    }
+
+    const rides = await listDriverRides(req.user.id);
+    res.json({ rides });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getDriverRideHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    if (!req.user) {
+      next(new AppError(401, "Unauthorized"));
+      return;
+    }
+
+    const result = await getDriverRideDetail(req.user.id, getRideIdParam(req));
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
 }
 
 export async function markDriverArrivalHandler(

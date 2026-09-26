@@ -4,6 +4,7 @@ import {
   cancelRideRequest,
   createRideRequest,
   estimateRideRequestFare,
+  listPassengerRideRequests,
 } from "../services/rideRequest.service.js";
 import {
   rideRequestCreateSchema,
@@ -38,6 +39,24 @@ export async function createRideRequestHandler(
     const input = rideRequestCreateSchema.parse(req.body);
     const request = await createRideRequest(req.user.id, input);
     res.status(201).json({ request });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function listPassengerRideRequestsHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    if (!req.user) {
+      next(new AppError(401, "Unauthorized"));
+      return;
+    }
+
+    const requests = await listPassengerRideRequests(req.user.id);
+    res.json({ requests });
   } catch (err) {
     next(err);
   }

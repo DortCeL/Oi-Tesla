@@ -4,6 +4,8 @@ import { requireAuth } from "../middleware/auth.js";
 import { setDriverStatusHandler } from "../controllers/driver.controller.js";
 import {
   completeRideHandler,
+  getDriverRideHandler,
+  listDriverRidesHandler,
   markDriverArrivalHandler,
   startRideHandler,
 } from "../controllers/ride.controller.js";
@@ -14,6 +16,16 @@ driverRouter.patch(
   "/status",
   requireAuth([Role.DRIVER]),
   setDriverStatusHandler,
+);
+driverRouter.get(
+  "/rides",
+  requireAuth([Role.DRIVER]),
+  listDriverRidesHandler,
+);
+driverRouter.get(
+  "/rides/:rideId",
+  requireAuth([Role.DRIVER]),
+  getDriverRideHandler,
 );
 driverRouter.patch(
   "/rides/:rideId/arrive",

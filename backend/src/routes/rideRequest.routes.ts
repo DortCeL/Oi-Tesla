@@ -5,10 +5,16 @@ import {
   cancelRideRequestHandler,
   createRideRequestHandler,
   estimateRideRequestHandler,
+  listPassengerRideRequestsHandler,
 } from "../controllers/rideRequest.controller.js";
 
 export const rideRequestRouter = Router();
 
+rideRequestRouter.get(
+  "/mine",
+  requireAuth([Role.PASSENGER]),
+  listPassengerRideRequestsHandler,
+);
 rideRequestRouter.post(
   "/estimate",
   requireAuth([Role.PASSENGER]),

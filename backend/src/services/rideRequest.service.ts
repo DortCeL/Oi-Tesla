@@ -2,6 +2,7 @@ import { Prisma, RequestStatus, RideStatus } from "@prisma/client";
 import { prisma } from "../db/prisma.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { calculateFare } from "../utils/fare.js";
+import { recordRideEvent } from "./rideEvent.service.js";
 import { tryMatchRideRequest } from "./pooling.service.js";
 import { toRideRequestResponse } from "../utils/rideRequestMapper.js";
 import type {
@@ -93,6 +94,16 @@ export async function createRideRequest(
   return toRideRequestResponse(finalRequest);
 }
 
+export async function listPassengerRideRequests(passengerId: string) {
+  const requests = await prisma.rideRequest.findMany({
+    where: { passengerId },
+    include: rideRequestInclude,
+    orderBy: { createdAt: "desc" },
+  });
+
+  return requests.map(toRideRequestResponse);
+}
+
 export async function cancelRideRequest(passengerId: string, requestId: string) {
   return prisma.$transaction(async (tx) => {
     const request = await tx.rideRequest.findUnique({
@@ -141,6 +152,9 @@ export async function cancelRideRequest(passengerId: string, requestId: string) 
       });
     }
 
+    const previousStatus = request.status;
+    const rideIdForEvent = request.rideId;
+
     const cancelled = await tx.rideRequest.update({
       where: { id: requestId },
       data: {
@@ -150,6 +164,16 @@ export async function cancelRideRequest(passengerId: string, requestId: string) 
       },
       include: rideRequestInclude,
     });
+
+    if (rideIdForEvent) {
+      await recordRideEvent(tx, {
+        rideId: rideIdForEvent,
+        rideRequestId: requestId,
+        fromStatus: previousStatus,
+        toStatus: RequestStatus.CANCELLED,
+        actorUserId: passengerId,
+      });
+    }
 
     return toRideRequestResponse(cancelled);
   });

@@ -1,7 +1,9 @@
 import { RequestStatus, RideStatus } from "@prisma/client";
 import { prisma } from "../db/prisma.js";
 import { AppError } from "../middleware/errorHandler.js";
+import { toRideEventResponse } from "../utils/rideEventMapper.js";
 import { toRideResponse } from "../utils/rideMapper.js";
+import { recordRideEvent } from "./rideEvent.service.js";
 
 const rideInclude = {
   pickupZone: { select: { id: true, name: true } },
@@ -20,6 +22,30 @@ async function getDriverRide(driverId: string, rideId: string) {
   return ride;
 }
 
+export async function listDriverRides(driverId: string) {
+  const rides = await prisma.ride.findMany({
+    where: { driverId },
+    include: rideInclude,
+    orderBy: { createdAt: "desc" },
+  });
+
+  return rides.map(toRideResponse);
+}
+
+export async function getDriverRideDetail(driverId: string, rideId: string) {
+  const ride = await getDriverRide(driverId, rideId);
+
+  const events = await prisma.rideEvent.findMany({
+    where: { rideId },
+    orderBy: { createdAt: "asc" },
+  });
+
+  return {
+    ride: toRideResponse(ride),
+    events: events.map(toRideEventResponse),
+  };
+}
+
 export async function markDriverArrival(driverId: string, rideId: string) {
   const ride = await getDriverRide(driverId, rideId);
 
@@ -31,10 +57,20 @@ export async function markDriverArrival(driverId: string, rideId: string) {
     throw new AppError(400, "Arrival already recorded");
   }
 
-  const updated = await prisma.ride.update({
-    where: { id: rideId },
-    data: { arrivedAt: new Date() },
-    include: rideInclude,
+  const updated = await prisma.$transaction(async (tx) => {
+    await recordRideEvent(tx, {
+      rideId,
+      fromStatus: RideStatus.MATCHED,
+      toStatus: RideStatus.MATCHED,
+      actorUserId: driverId,
+      note: "driver_arrived",
+    });
+
+    return tx.ride.update({
+      where: { id: rideId },
+      data: { arrivedAt: new Date() },
+      include: rideInclude,
+    });
   });
 
   return toRideResponse(updated);
@@ -56,12 +92,31 @@ export async function startRide(driverId: string, rideId: string) {
   }
 
   const updated = await prisma.$transaction(async (tx) => {
+    const matchedRequests = await tx.rideRequest.findMany({
+      where: { rideId, status: RequestStatus.MATCHED },
+      select: { id: true },
+    });
+
     await tx.rideRequest.updateMany({
-      where: {
-        rideId,
-        status: RequestStatus.MATCHED,
-      },
+      where: { rideId, status: RequestStatus.MATCHED },
       data: { status: RequestStatus.IN_PROGRESS },
+    });
+
+    for (const request of matchedRequests) {
+      await recordRideEvent(tx, {
+        rideId,
+        rideRequestId: request.id,
+        fromStatus: RequestStatus.MATCHED,
+        toStatus: RequestStatus.IN_PROGRESS,
+        actorUserId: driverId,
+      });
+    }
+
+    await recordRideEvent(tx, {
+      rideId,
+      fromStatus: RideStatus.MATCHED,
+      toStatus: RideStatus.IN_PROGRESS,
+      actorUserId: driverId,
     });
 
     return tx.ride.update({
@@ -89,12 +144,31 @@ export async function completeRide(driverId: string, rideId: string) {
   }
 
   const updated = await prisma.$transaction(async (tx) => {
+    const activeRequests = await tx.rideRequest.findMany({
+      where: { rideId, status: RequestStatus.IN_PROGRESS },
+      select: { id: true },
+    });
+
     await tx.rideRequest.updateMany({
-      where: {
-        rideId,
-        status: RequestStatus.IN_PROGRESS,
-      },
+      where: { rideId, status: RequestStatus.IN_PROGRESS },
       data: { status: RequestStatus.COMPLETED },
+    });
+
+    for (const request of activeRequests) {
+      await recordRideEvent(tx, {
+        rideId,
+        rideRequestId: request.id,
+        fromStatus: RequestStatus.IN_PROGRESS,
+        toStatus: RequestStatus.COMPLETED,
+        actorUserId: driverId,
+      });
+    }
+
+    await recordRideEvent(tx, {
+      rideId,
+      fromStatus: RideStatus.IN_PROGRESS,
+      toStatus: RideStatus.COMPLETED,
+      actorUserId: driverId,
     });
 
     return tx.ride.update({

@@ -15,6 +15,7 @@ import {
   type RideRequest,
 } from "@prisma/client";
 import { prisma } from "../db/prisma.js";
+import { recordRideEvent } from "./rideEvent.service.js";
 import {
   hasEnoughSeats,
   isDestinationCompatible,
@@ -37,6 +38,7 @@ type MatchableRequest = Pick<
   | "type"
   | "status"
   | "rideId"
+  | "passengerId"
 >;
 
 /** Turn zone_distance rows into dist(from, to) for in-memory checks. */
@@ -86,6 +88,8 @@ function resolveRideStatusAfterAttach(
 async function maybeLockRide(
   tx: Prisma.TransactionClient,
   rideId: string,
+  actorUserId: string,
+  rideRequestId: string,
 ) {
   const ride = await tx.ride.findUnique({
     where: { id: rideId },
@@ -107,25 +111,41 @@ async function maybeLockRide(
       where: { id: rideId },
       data: { status: nextStatus },
     });
+
+    await recordRideEvent(tx, {
+      rideId,
+      rideRequestId,
+      fromStatus: RideStatus.WAITING,
+      toStatus: RideStatus.MATCHED,
+      actorUserId,
+      note: "ride_locked",
+    });
   }
 }
 
 /** Pool onto an existing ride: bump seatsTaken and link the request. */
 async function attachRequestToRide(
   tx: Prisma.TransactionClient,
-  requestId: string,
+  request: MatchableRequest,
   rideId: string,
-  seatsRequested: number,
 ) {
   await tx.ride.update({
     where: { id: rideId },
-    data: { seatsTaken: { increment: seatsRequested } },
+    data: { seatsTaken: { increment: request.seatsRequested } },
   });
 
-  await maybeLockRide(tx, rideId);
+  await recordRideEvent(tx, {
+    rideId,
+    rideRequestId: request.id,
+    fromStatus: RequestStatus.REQUESTED,
+    toStatus: RequestStatus.MATCHED,
+    actorUserId: request.passengerId,
+  });
+
+  await maybeLockRide(tx, rideId, request.passengerId, request.id);
 
   return tx.rideRequest.update({
-    where: { id: requestId },
+    where: { id: request.id },
     data: {
       rideId,
       status: RequestStatus.MATCHED,
@@ -169,20 +189,38 @@ async function createRideAndAttach(
     return null;
   }
 
+  const initialStatus = resolveRideStatusAfterAttach(
+    request.type,
+    tesla.capacity,
+    request.seatsRequested,
+  );
+
   const ride = await tx.ride.create({
     data: {
       teslaId: tesla.id,
       driverId: driver.userId,
       pickupZoneId: request.pickupZoneId,
       type: request.type,
-      status: resolveRideStatusAfterAttach(
-        request.type,
-        tesla.capacity,
-        request.seatsRequested,
-      ),
+      status: initialStatus,
       capacity: tesla.capacity,
       seatsTaken: request.seatsRequested,
     },
+  });
+
+  await recordRideEvent(tx, {
+    rideId: ride.id,
+    rideRequestId: request.id,
+    fromStatus: "CREATED",
+    toStatus: initialStatus,
+    actorUserId: request.passengerId,
+  });
+
+  await recordRideEvent(tx, {
+    rideId: ride.id,
+    rideRequestId: request.id,
+    fromStatus: RequestStatus.REQUESTED,
+    toStatus: RequestStatus.MATCHED,
+    actorUserId: request.passengerId,
   });
 
   return tx.rideRequest.update({
@@ -299,12 +337,7 @@ async function tryJoinSharedRide(
       continue;
     }
 
-    return attachRequestToRide(
-      tx,
-      request.id,
-      lockedRide.id,
-      request.seatsRequested,
-    );
+    return attachRequestToRide(tx, request, lockedRide.id);
   }
 
   return null;
