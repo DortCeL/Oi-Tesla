@@ -48,6 +48,30 @@ export async function createRideRequest(
     .send(body);
 }
 
+export async function cancelRideRequest(token: string, requestId: string) {
+  return request(app)
+    .post(`/api/ride-requests/${requestId}/cancel`)
+    .set("Authorization", `Bearer ${token}`);
+}
+
+export async function driverArrive(token: string, rideId: string) {
+  return request(app)
+    .patch(`/api/driver/rides/${rideId}/arrive`)
+    .set("Authorization", `Bearer ${token}`);
+}
+
+export async function driverStart(token: string, rideId: string) {
+  return request(app)
+    .patch(`/api/driver/rides/${rideId}/start`)
+    .set("Authorization", `Bearer ${token}`);
+}
+
+export async function driverComplete(token: string, rideId: string) {
+  return request(app)
+    .patch(`/api/driver/rides/${rideId}/complete`)
+    .set("Authorization", `Bearer ${token}`);
+}
+
 export async function getZoneId(name: string): Promise<number> {
   const zone = await prisma.zone.findFirst({ where: { name } });
   if (!zone) {
@@ -61,7 +85,23 @@ export async function cleanupRides(rideIds: string[]) {
     return;
   }
 
-  await prisma.rideEvent.deleteMany({ where: { rideId: { in: rideIds } } });
+  const requestIds = (
+    await prisma.rideRequest.findMany({
+      where: { rideId: { in: rideIds } },
+      select: { id: true },
+    })
+  ).map((row) => row.id);
+
+  await prisma.rideEvent.deleteMany({
+    where: {
+      OR: [
+        { rideId: { in: rideIds } },
+        ...(requestIds.length > 0
+          ? [{ rideRequestId: { in: requestIds } }]
+          : []),
+      ],
+    },
+  });
   await prisma.payment.deleteMany({
     where: { rideRequest: { rideId: { in: rideIds } } },
   });
