@@ -2,8 +2,9 @@
  * Matches a passenger ride_request to a Tesla ride after booking.
  *
  * Flow (called from rideRequest.service after create):
- *   SOLO   → always start a new ride (never pool)
- *   SHARED → try join an existing WAITING ride at same pickup, else start new
+ *   SOLO   → always start a new ride (never pool); ride locks immediately (MATCHED)
+ *   SHARED → try join an existing WAITING ride at same pickup, else start new;
+ *            ride locks (MATCHED) when seatsTaken === capacity
  *   no online driver → return unmatched (status stays REQUESTED)
  */
 import {
@@ -14,6 +15,7 @@ import {
   type RideRequest,
 } from "@prisma/client";
 import { prisma } from "../db/prisma.js";
+import { recordRideEvent } from "./rideEvent.service.js";
 import {
   hasEnoughSeats,
   isDestinationCompatible,
@@ -36,6 +38,7 @@ type MatchableRequest = Pick<
   | "type"
   | "status"
   | "rideId"
+  | "passengerId"
 >;
 
 /** Turn zone_distance rows into dist(from, to) for in-memory checks. */
@@ -68,20 +71,81 @@ async function loadDistanceLookup(
   return buildDistanceLookup(rows);
 }
 
+/** SOLO locks on match; SHARED locks only when every seat is taken. */
+function resolveRideStatusAfterAttach(
+  type: RideType,
+  capacity: number,
+  seatsTaken: number,
+): RideStatus {
+  if (type === RideType.SOLO) {
+    return RideStatus.MATCHED;
+  }
+
+  return seatsTaken >= capacity ? RideStatus.MATCHED : RideStatus.WAITING;
+}
+
+/** Flip ride WAITING → MATCHED when lock rules say the ride is sealed. */
+async function maybeLockRide(
+  tx: Prisma.TransactionClient,
+  rideId: string,
+  actorUserId: string,
+  rideRequestId: string,
+) {
+  const ride = await tx.ride.findUnique({
+    where: { id: rideId },
+    select: { type: true, capacity: true, seatsTaken: true, status: true },
+  });
+
+  if (!ride || ride.status !== RideStatus.WAITING) {
+    return;
+  }
+
+  const nextStatus = resolveRideStatusAfterAttach(
+    ride.type,
+    ride.capacity,
+    ride.seatsTaken,
+  );
+
+  if (nextStatus !== ride.status) {
+    await tx.ride.update({
+      where: { id: rideId },
+      data: { status: nextStatus },
+    });
+
+    await recordRideEvent(tx, {
+      rideId,
+      rideRequestId,
+      fromStatus: RideStatus.WAITING,
+      toStatus: RideStatus.MATCHED,
+      actorUserId,
+      note: "ride_locked",
+    });
+  }
+}
+
 /** Pool onto an existing ride: bump seatsTaken and link the request. */
 async function attachRequestToRide(
   tx: Prisma.TransactionClient,
-  requestId: string,
+  request: MatchableRequest,
   rideId: string,
-  seatsRequested: number,
 ) {
   await tx.ride.update({
     where: { id: rideId },
-    data: { seatsTaken: { increment: seatsRequested } },
+    data: { seatsTaken: { increment: request.seatsRequested } },
   });
 
+  await recordRideEvent(tx, {
+    rideId,
+    rideRequestId: request.id,
+    fromStatus: RequestStatus.REQUESTED,
+    toStatus: RequestStatus.MATCHED,
+    actorUserId: request.passengerId,
+  });
+
+  await maybeLockRide(tx, rideId, request.passengerId, request.id);
+
   return tx.rideRequest.update({
-    where: { id: requestId },
+    where: { id: request.id },
     data: {
       rideId,
       status: RequestStatus.MATCHED,
@@ -125,16 +189,38 @@ async function createRideAndAttach(
     return null;
   }
 
+  const initialStatus = resolveRideStatusAfterAttach(
+    request.type,
+    tesla.capacity,
+    request.seatsRequested,
+  );
+
   const ride = await tx.ride.create({
     data: {
       teslaId: tesla.id,
       driverId: driver.userId,
       pickupZoneId: request.pickupZoneId,
       type: request.type,
-      status: RideStatus.WAITING,
+      status: initialStatus,
       capacity: tesla.capacity,
       seatsTaken: request.seatsRequested,
     },
+  });
+
+  await recordRideEvent(tx, {
+    rideId: ride.id,
+    rideRequestId: request.id,
+    fromStatus: "CREATED",
+    toStatus: initialStatus,
+    actorUserId: request.passengerId,
+  });
+
+  await recordRideEvent(tx, {
+    rideId: ride.id,
+    rideRequestId: request.id,
+    fromStatus: RequestStatus.REQUESTED,
+    toStatus: RequestStatus.MATCHED,
+    actorUserId: request.passengerId,
   });
 
   return tx.rideRequest.update({
@@ -251,12 +337,7 @@ async function tryJoinSharedRide(
       continue;
     }
 
-    return attachRequestToRide(
-      tx,
-      request.id,
-      lockedRide.id,
-      request.seatsRequested,
-    );
+    return attachRequestToRide(tx, request, lockedRide.id);
   }
 
   return null;

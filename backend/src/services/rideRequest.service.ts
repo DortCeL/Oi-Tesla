@@ -1,7 +1,8 @@
-import { Prisma } from "@prisma/client";
+import { Prisma, RequestStatus, RideStatus } from "@prisma/client";
 import { prisma } from "../db/prisma.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { calculateFare } from "../utils/fare.js";
+import { recordRideEvent } from "./rideEvent.service.js";
 import { tryMatchRideRequest } from "./pooling.service.js";
 import { toRideRequestResponse } from "../utils/rideRequestMapper.js";
 import type {
@@ -91,4 +92,89 @@ export async function createRideRequest(
     }));
 
   return toRideRequestResponse(finalRequest);
+}
+
+export async function listPassengerRideRequests(passengerId: string) {
+  const requests = await prisma.rideRequest.findMany({
+    where: { passengerId },
+    include: rideRequestInclude,
+    orderBy: { createdAt: "desc" },
+  });
+
+  return requests.map(toRideRequestResponse);
+}
+
+export async function cancelRideRequest(passengerId: string, requestId: string) {
+  return prisma.$transaction(async (tx) => {
+    const request = await tx.rideRequest.findUnique({
+      where: { id: requestId },
+      include: {
+        ride: { select: { id: true, status: true } },
+      },
+    });
+
+    if (!request || request.passengerId !== passengerId) {
+      throw new AppError(404, "Ride request not found");
+    }
+
+    if (request.status === RequestStatus.CANCELLED) {
+      throw new AppError(400, "Ride request already cancelled");
+    }
+
+    if (
+      request.status === RequestStatus.IN_PROGRESS ||
+      request.status === RequestStatus.COMPLETED
+    ) {
+      throw new AppError(400, "Cannot cancel ride request in current status");
+    }
+
+    if (request.rideId && request.ride) {
+      if (request.ride.status !== RideStatus.WAITING) {
+        throw new AppError(400, "Cannot cancel after ride is locked");
+      }
+
+      await tx.$queryRaw(
+        Prisma.sql`SELECT 1 FROM rides WHERE id = ${request.rideId} FOR UPDATE`,
+      );
+
+      const ride = await tx.ride.findUnique({
+        where: { id: request.rideId },
+        select: { status: true },
+      });
+
+      if (!ride || ride.status !== RideStatus.WAITING) {
+        throw new AppError(400, "Cannot cancel after ride is locked");
+      }
+
+      await tx.ride.update({
+        where: { id: request.rideId },
+        data: { seatsTaken: { decrement: request.seatsRequested } },
+      });
+    }
+
+    const previousStatus = request.status;
+    const rideIdForEvent = request.rideId;
+
+    const cancelled = await tx.rideRequest.update({
+      where: { id: requestId },
+      data: {
+        status: RequestStatus.CANCELLED,
+        cancelledAt: new Date(),
+        rideId: null,
+      },
+      include: rideRequestInclude,
+    });
+
+    if (rideIdForEvent) {
+      await recordRideEvent(tx, {
+        rideId: rideIdForEvent,
+        rideRequestId: requestId,
+        fromStatus: previousStatus,
+        toStatus: RequestStatus.CANCELLED,
+        actorUserId: passengerId,
+      });
+    }
+
+    return toRideRequestResponse(cancelled);
+  });
 }
