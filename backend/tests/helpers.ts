@@ -21,11 +21,26 @@ export async function login(
   return res.body.token as string;
 }
 
-export async function setDriverOnline(token: string, isOnline = true) {
+export async function setDriverOnline(
+  token: string,
+  isOnline = true,
+  zoneIds?: number[],
+) {
+  let resolvedZoneIds = zoneIds;
+  if (isOnline && !resolvedZoneIds) {
+    const zones = await prisma.zone.findMany({ select: { id: true } });
+    resolvedZoneIds = zones.map((zone) => zone.id);
+  }
+
+  const body =
+    isOnline && resolvedZoneIds
+      ? { isOnline, zoneIds: resolvedZoneIds }
+      : { isOnline };
+
   const res = await request(app)
     .patch("/api/driver/status")
     .set("Authorization", `Bearer ${token}`)
-    .send({ isOnline });
+    .send(body);
 
   if (res.status !== 200) {
     throw new Error(`setDriverOnline failed: ${res.status} ${res.text}`);
@@ -110,6 +125,12 @@ export async function cleanupRides(rideIds: string[]) {
 }
 
 /** Wipe all demo-app rides so tests start from a clean pool state. */
+export async function getRideRequest(token: string, requestId: string) {
+  return request(app)
+    .get(`/api/ride-requests/${requestId}`)
+    .set("Authorization", `Bearer ${token}`);
+}
+
 export async function cleanupAllDemoRides() {
   const demoEmails = [
     "jashim@oitesla.test",

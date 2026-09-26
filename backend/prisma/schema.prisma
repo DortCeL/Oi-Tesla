@@ -62,9 +62,10 @@ model User {
 }
 
 model Driver {
-  userId   String  @id @map("user_id")
-  user     User    @relation(fields: [userId], references: [id])
-  isOnline Boolean @default(false) @map("is_online")
+  userId         String  @id @map("user_id")
+  user           User    @relation(fields: [userId], references: [id])
+  isOnline       Boolean @default(false) @map("is_online")
+  activeZoneIds  Int[]   @default([]) @map("active_zone_ids")
 
   teslas Tesla[]
   rides  Ride[]
@@ -73,12 +74,10 @@ model Driver {
 }
 
 model Passenger {
-  userId        String  @id @map("user_id")
-  user          User    @relation(fields: [userId], references: [id])
-  addressZoneId Int     @map("address_zone_id")
-  addressZone   Zone    @relation(fields: [addressZoneId], references: [id])
-  occupation    String
-  affiliation   String? // company / school / university, free text
+  userId      String  @id @map("user_id")
+  user        User    @relation(fields: [userId], references: [id])
+  occupation  String?
+  affiliation String?
 
   rideRequests RideRequest[]
 
@@ -105,7 +104,6 @@ model Zone {
   lat  Decimal @db.Decimal(9, 6)
   lng  Decimal @db.Decimal(9, 6)
 
-  passengersLivingHere    Passenger[]
   ridesPickingUpHere      Ride[]        @relation("RidePickupZone")
   requestsPickingUpHere   RideRequest[] @relation("RequestPickupZone")
   requestsDroppingOffHere RideRequest[] @relation("RequestDestinationZone")

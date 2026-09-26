@@ -94,6 +94,123 @@ export async function createRideRequest(
   return toRideRequestResponse(finalRequest);
 }
 
+const activeRideStatuses: RideStatus[] = [
+  RideStatus.WAITING,
+  RideStatus.MATCHED,
+  RideStatus.IN_PROGRESS,
+];
+
+export async function getPassengerRideRequest(
+  passengerId: string,
+  requestId: string,
+) {
+  let request = await prisma.rideRequest.findUnique({
+    where: { id: requestId },
+    include: {
+      ...rideRequestInclude,
+      ride: {
+        include: {
+          driver: {
+            include: {
+              user: { select: { name: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!request || request.passengerId !== passengerId) {
+    throw new AppError(404, "Ride request not found");
+  }
+
+  if (request.status === RequestStatus.REQUESTED && !request.rideId) {
+    await tryMatchRideRequest(requestId);
+    request = await prisma.rideRequest.findUniqueOrThrow({
+      where: { id: requestId },
+      include: {
+        ...rideRequestInclude,
+        ride: {
+          include: {
+            driver: {
+              include: {
+                user: { select: { name: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  return {
+    request: toRideRequestResponse(request),
+    ride: request.ride
+      ? {
+          id: request.ride.id,
+          status: request.ride.status,
+          seatsTaken: request.ride.seatsTaken,
+          capacity: request.ride.capacity,
+          arrivedAt: request.ride.arrivedAt,
+          startedAt: request.ride.startedAt,
+          completedAt: request.ride.completedAt,
+        }
+      : null,
+    driver: request.ride?.driver.user
+      ? { name: request.ride.driver.user.name }
+      : null,
+  };
+}
+
+export async function getRideRequestPoolMates(
+  passengerId: string,
+  requestId: string,
+) {
+  const request = await prisma.rideRequest.findUnique({
+    where: { id: requestId },
+    include: {
+      ride: { select: { id: true, status: true } },
+    },
+  });
+
+  if (!request || request.passengerId !== passengerId) {
+    throw new AppError(404, "Ride request not found");
+  }
+
+  if (!request.rideId || !request.ride) {
+    throw new AppError(400, "Ride request is not on a pool yet");
+  }
+
+  if (!activeRideStatuses.includes(request.ride.status)) {
+    throw new AppError(403, "Pool mates are only visible during an active ride");
+  }
+
+  const mates = await prisma.rideRequest.findMany({
+    where: {
+      rideId: request.rideId,
+      status: { in: [RequestStatus.MATCHED, RequestStatus.IN_PROGRESS] },
+      passengerId: { not: passengerId },
+    },
+    include: {
+      destinationZone: { select: { id: true, name: true } },
+      passenger: {
+        include: {
+          user: { select: { name: true, gender: true } },
+        },
+      },
+    },
+  });
+
+  return {
+    poolMates: mates.map((mate) => ({
+      name: mate.passenger.user.name,
+      gender: mate.passenger.user.gender,
+      seatsRequested: mate.seatsRequested,
+      destinationZone: mate.destinationZone,
+    })),
+  };
+}
+
 export async function listPassengerRideRequests(passengerId: string) {
   const requests = await prisma.rideRequest.findMany({
     where: { passengerId },

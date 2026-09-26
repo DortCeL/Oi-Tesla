@@ -169,7 +169,6 @@ async function main() {
       hobbies: ["reading", "music"],
       passenger: {
         create: {
-          addressZoneId: zoneByName["Banani"],
           occupation: "Software Engineer",
           affiliation: "Grameenphone",
         },
@@ -189,7 +188,6 @@ async function main() {
       hobbies: ["photography"],
       passenger: {
         create: {
-          addressZoneId: zoneByName["Banani"],
           occupation: "Bank Officer",
           affiliation: "BRAC Bank",
         },
@@ -209,7 +207,6 @@ async function main() {
       hobbies: ["cooking", "travel"],
       passenger: {
         create: {
-          addressZoneId: zoneByName["Mohakhali"],
           occupation: "Student",
           affiliation: "North South University",
         },

@@ -5,6 +5,8 @@ import {
   cancelRideRequestHandler,
   createRideRequestHandler,
   estimateRideRequestHandler,
+  getPassengerRideRequestHandler,
+  getRideRequestPoolMatesHandler,
   listPassengerRideRequestsHandler,
 } from "../controllers/rideRequest.controller.js";
 
@@ -24,6 +26,16 @@ rideRequestRouter.post(
   "/",
   requireAuth([Role.PASSENGER]),
   createRideRequestHandler,
+);
+rideRequestRouter.get(
+  "/:id/pool-mates",
+  requireAuth([Role.PASSENGER]),
+  getRideRequestPoolMatesHandler,
+);
+rideRequestRouter.get(
+  "/:id",
+  requireAuth([Role.PASSENGER]),
+  getPassengerRideRequestHandler,
 );
 rideRequestRouter.post(
   "/:id/cancel",
