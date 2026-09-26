@@ -1,0 +1,119 @@
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { prisma } from "../src/db/prisma.js";
+import {
+  cleanupAllDemoRides,
+  cleanupRides,
+  createRideRequest,
+  driverArrive,
+  driverComplete,
+  driverStart,
+  getZoneId,
+  login,
+  setDriverOnline,
+} from "./helpers.js";
+
+describe("PRD driver lifecycle", () => {
+  const trackedRideIds = new Set<string>();
+
+  beforeEach(async () => {
+    await cleanupAllDemoRides();
+    const driverToken = await login("jashim@oitesla.test");
+    await setDriverOnline(driverToken, true);
+  });
+
+  afterEach(async () => {
+    await cleanupRides([...trackedRideIds]);
+    trackedRideIds.clear();
+  });
+
+  async function createLockedPoolRide() {
+    const banani = await getZoneId("Banani");
+    const mohakhali = await getZoneId("Mohakhali");
+
+    const nusratToken = await login("nusrat@oitesla.test");
+    const rafiqToken = await login("rafiq@oitesla.test");
+    const shirinToken = await login("shirin@oitesla.test");
+
+    await createRideRequest(nusratToken, {
+      pickupZoneId: banani,
+      destinationZoneId: mohakhali,
+      type: "SHARED",
+      seatsRequested: 1,
+      paymentMethod: "CASH",
+    });
+    await createRideRequest(rafiqToken, {
+      pickupZoneId: banani,
+      destinationZoneId: mohakhali,
+      type: "SHARED",
+      seatsRequested: 1,
+      paymentMethod: "CASH",
+    });
+    const shirinRes = await createRideRequest(shirinToken, {
+      pickupZoneId: banani,
+      destinationZoneId: mohakhali,
+      type: "SHARED",
+      seatsRequested: 1,
+      paymentMethod: "CASH",
+    });
+
+    const rideId = shirinRes.body.request.rideId as string;
+    trackedRideIds.add(rideId);
+    return { rideId, driverToken: await login("jashim@oitesla.test") };
+  }
+
+  it("runs arrive → start → complete and updates all request statuses", async () => {
+    const { rideId, driverToken } = await createLockedPoolRide();
+
+    expect((await driverArrive(driverToken, rideId)).status).toBe(200);
+    expect((await driverStart(driverToken, rideId)).status).toBe(200);
+    expect((await driverComplete(driverToken, rideId)).status).toBe(200);
+
+    const ride = await prisma.ride.findUniqueOrThrow({ where: { id: rideId } });
+    expect(ride.status).toBe("COMPLETED");
+    expect(ride.arrivedAt).not.toBeNull();
+    expect(ride.startedAt).not.toBeNull();
+    expect(ride.completedAt).not.toBeNull();
+
+    const requests = await prisma.rideRequest.findMany({ where: { rideId } });
+    expect(requests).toHaveLength(3);
+    for (const req of requests) {
+      expect(req.status).toBe("COMPLETED");
+    }
+  });
+
+  it("rejects start before driver marks arrival", async () => {
+    const { rideId, driverToken } = await createLockedPoolRide();
+
+    const startRes = await driverStart(driverToken, rideId);
+    expect(startRes.status).toBe(400);
+  });
+
+  it("rejects complete before the ride has started", async () => {
+    const { rideId, driverToken } = await createLockedPoolRide();
+
+    expect((await driverArrive(driverToken, rideId)).status).toBe(200);
+
+    const completeRes = await driverComplete(driverToken, rideId);
+    expect(completeRes.status).toBe(400);
+  });
+
+  it("rejects arrival while the ride is still WAITING (not locked)", async () => {
+    const banani = await getZoneId("Banani");
+    const mohakhali = await getZoneId("Mohakhali");
+    const driverToken = await login("jashim@oitesla.test");
+    const nusratToken = await login("nusrat@oitesla.test");
+
+    const nusratRes = await createRideRequest(nusratToken, {
+      pickupZoneId: banani,
+      destinationZoneId: mohakhali,
+      type: "SHARED",
+      seatsRequested: 1,
+      paymentMethod: "CASH",
+    });
+    const rideId = nusratRes.body.request.rideId as string;
+    trackedRideIds.add(rideId);
+
+    const arriveRes = await driverArrive(driverToken, rideId);
+    expect(arriveRes.status).toBe(400);
+  });
+});
