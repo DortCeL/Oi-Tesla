@@ -1,4 +1,4 @@
-import { Form, redirect, useActionData } from "react-router";
+import { Form, Link, redirect, useActionData } from "react-router";
 import type { Route } from "./+types/login";
 import { apiUrl } from "../lib/api";
 import { getAuth, setAuth, type AuthRole } from "../lib/auth.client";
@@ -23,6 +23,10 @@ export async function clientAction({ request }: Route.ClientActionArgs) {
   const role = form.get("role") as AuthRole;
   const emailOrPhone = String(form.get("emailOrPhone") ?? "").trim();
   const password = String(form.get("password") ?? "");
+
+  if (!emailOrPhone || !password) {
+    return { error: "Email/phone and password are required" };
+  }
 
   const path =
     role === "DRIVER" ? "/auth/driver/login" : "/auth/passenger/login";
@@ -69,12 +73,16 @@ export default function Login() {
         <input
           name="emailOrPhone"
           placeholder="Email or phone"
+          required
+          autoComplete="username"
           className="w-full rounded border px-3 py-2"
         />
         <input
           name="password"
           type="password"
           placeholder="Password"
+          required
+          autoComplete="current-password"
           className="w-full rounded border px-3 py-2"
         />
 
@@ -91,6 +99,17 @@ export default function Login() {
       </Form>
 
       <p className="mt-6 text-sm text-gray-500">
+        No account?{" "}
+        <Link to="/signup/passenger" className="underline">
+          Passenger
+        </Link>{" "}
+        or{" "}
+        <Link to="/signup/driver" className="underline">
+          Driver
+        </Link>{" "}
+        signup
+      </p>
+      <p className="mt-2 text-sm text-gray-400">
         Demo: nusrat@oitesla.test or jashim@oitesla.test — password123
       </p>
     </main>

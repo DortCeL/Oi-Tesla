@@ -1,8 +1,20 @@
-import { Link } from "react-router";
+import { Link, redirect } from "react-router";
 import type { Route } from "./+types/home";
+import { getAuth } from "../lib/auth.client";
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: "Oi Tesla" }];
+}
+
+export async function clientLoader() {
+  const auth = getAuth();
+  if (auth?.role === "PASSENGER") {
+    throw redirect("/passenger");
+  }
+  if (auth?.role === "DRIVER") {
+    throw redirect("/driver");
+  }
+  return null;
 }
 
 export default function Home() {
@@ -12,12 +24,26 @@ export default function Home() {
       <p className="mt-2 text-gray-600">
         Share a seat. Split the fare. Survive Dhaka traffic.
       </p>
-      <Link
-        to="/login"
-        className="mt-6 inline-block rounded bg-gray-900 px-4 py-2 text-white"
-      >
-        Sign in
-      </Link>
+      <div className="mt-6 flex flex-col gap-3">
+        <Link
+          to="/login"
+          className="inline-block rounded bg-gray-900 px-4 py-2 text-center text-white"
+        >
+          Sign in
+        </Link>
+        <Link
+          to="/signup/passenger"
+          className="inline-block rounded border px-4 py-2 text-center"
+        >
+          Passenger signup
+        </Link>
+        <Link
+          to="/signup/driver"
+          className="inline-block rounded border px-4 py-2 text-center"
+        >
+          Driver signup
+        </Link>
+      </div>
     </main>
   );
 }
