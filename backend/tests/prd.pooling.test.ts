@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   cleanupAllDemoRides,
   cleanupRides,
+  acceptRideRequest,
+  createAndAcceptRideRequest,
   createRideRequest,
   getZoneId,
   login,
@@ -33,11 +35,12 @@ describe("PRD pooling edge cases", () => {
     const mohakhali = await getZoneId("Mohakhali");
     const gulshan = await getZoneId("Gulshan 1");
 
+    const driverToken = await login("jashim@oitesla.test");
     const nusratToken = await login("nusrat@oitesla.test");
     const rafiqToken = await login("rafiq@oitesla.test");
 
     // Gulshan first (farther), Mohakhali second (closer) — reverse of PRD order.
-    const firstRes = await createRideRequest(nusratToken, {
+    const firstRes = await createAndAcceptRideRequest(nusratToken, driverToken, {
       pickupZoneId: banani,
       destinationZoneId: gulshan,
       type: "SHARED",
@@ -55,9 +58,14 @@ describe("PRD pooling edge cases", () => {
       paymentMethod: "CASH",
     });
     expect(secondRes.status).toBe(201);
-    trackRideId(secondRes.body.request.rideId);
+    expect(secondRes.body.request.status).toBe("REQUESTED");
+    expect(secondRes.body.request.rideId).toBeNull();
 
-    expect(secondRes.body.request.rideId).not.toBe(firstRes.body.request.rideId);
+    const acceptSecond = await acceptRideRequest(
+      driverToken,
+      secondRes.body.request.id as string,
+    );
+    expect(acceptSecond.status).toBe(400);
   });
 
   it("does not pool across different pickup zones", async () => {
@@ -65,10 +73,11 @@ describe("PRD pooling edge cases", () => {
     const gulshan = await getZoneId("Gulshan 1");
     const mohakhali = await getZoneId("Mohakhali");
 
+    const driverToken = await login("jashim@oitesla.test");
     const nusratToken = await login("nusrat@oitesla.test");
     const rafiqToken = await login("rafiq@oitesla.test");
 
-    const firstRes = await createRideRequest(nusratToken, {
+    const firstRes = await createAndAcceptRideRequest(nusratToken, driverToken, {
       pickupZoneId: banani,
       destinationZoneId: mohakhali,
       type: "SHARED",
@@ -86,19 +95,25 @@ describe("PRD pooling edge cases", () => {
       paymentMethod: "CASH",
     });
     expect(secondRes.status).toBe(201);
-    trackRideId(secondRes.body.request.rideId);
+    expect(secondRes.body.request.status).toBe("REQUESTED");
+    expect(secondRes.body.request.rideId).toBeNull();
 
-    expect(secondRes.body.request.rideId).not.toBe(firstRes.body.request.rideId);
+    const acceptSecond = await acceptRideRequest(
+      driverToken,
+      secondRes.body.request.id as string,
+    );
+    expect(acceptSecond.status).toBe(400);
   });
 
   it("never joins an existing SHARED pool when booking SOLO", async () => {
     const banani = await getZoneId("Banani");
     const mohakhali = await getZoneId("Mohakhali");
 
+    const driverToken = await login("jashim@oitesla.test");
     const nusratToken = await login("nusrat@oitesla.test");
     const rafiqToken = await login("rafiq@oitesla.test");
 
-    const sharedRes = await createRideRequest(nusratToken, {
+    const sharedRes = await createAndAcceptRideRequest(nusratToken, driverToken, {
       pickupZoneId: banani,
       destinationZoneId: mohakhali,
       type: "SHARED",
@@ -116,9 +131,13 @@ describe("PRD pooling edge cases", () => {
       paymentMethod: "CASH",
     });
     expect(soloRes.status).toBe(201);
-    trackRideId(soloRes.body.request.rideId);
+    expect(soloRes.body.request.status).toBe("REQUESTED");
+    expect(soloRes.body.request.rideId).toBeNull();
 
-    expect(soloRes.body.request.rideId).not.toBe(sharedRes.body.request.rideId);
-    expect(soloRes.body.request.status).toBe("MATCHED");
+    const acceptSolo = await acceptRideRequest(
+      driverToken,
+      soloRes.body.request.id as string,
+    );
+    expect(acceptSolo.status).toBe(400);
   });
 });

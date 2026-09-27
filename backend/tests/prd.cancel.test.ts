@@ -4,6 +4,7 @@ import {
   cancelRideRequest,
   cleanupAllDemoRides,
   cleanupRides,
+  createAndAcceptRideRequest,
   createRideRequest,
   getZoneId,
   login,
@@ -29,10 +30,11 @@ describe("PRD cancellation rules", () => {
     const mohakhali = await getZoneId("Mohakhali");
     const gulshan = await getZoneId("Gulshan 1");
 
+    const driverToken = await login("jashim@oitesla.test");
     const nusratToken = await login("nusrat@oitesla.test");
     const rafiqToken = await login("rafiq@oitesla.test");
 
-    const nusratRes = await createRideRequest(nusratToken, {
+    const nusratRes = await createAndAcceptRideRequest(nusratToken, driverToken, {
       pickupZoneId: banani,
       destinationZoneId: mohakhali,
       type: "SHARED",
@@ -63,15 +65,51 @@ describe("PRD cancellation rules", () => {
     expect(poolRide.status).toBe("WAITING");
   });
 
+  it("closes the ride when the last passenger cancels", async () => {
+    const banani = await getZoneId("Banani");
+    const mohakhali = await getZoneId("Mohakhali");
+    const driverToken = await login("jashim@oitesla.test");
+    const nusratToken = await login("nusrat@oitesla.test");
+
+    const first = await createAndAcceptRideRequest(nusratToken, driverToken, {
+      pickupZoneId: banani,
+      destinationZoneId: mohakhali,
+      type: "SHARED",
+      seatsRequested: 1,
+      paymentMethod: "CASH",
+    });
+    const rideId = first.body.request.rideId as string;
+    trackedRideIds.add(rideId);
+
+    const cancelRes = await cancelRideRequest(nusratToken, first.body.request.id as string);
+    expect(cancelRes.status).toBe(200);
+
+    const ride = await prisma.ride.findUniqueOrThrow({ where: { id: rideId } });
+    expect(ride.seatsTaken).toBe(0);
+    expect(ride.status).toBe("CANCELLED");
+
+    const second = await createAndAcceptRideRequest(nusratToken, driverToken, {
+      pickupZoneId: banani,
+      destinationZoneId: mohakhali,
+      type: "SHARED",
+      seatsRequested: 1,
+      paymentMethod: "CASH",
+    });
+    expect(second.status).toBe(201);
+    expect(second.body.request.status).toBe("MATCHED");
+    trackedRideIds.add(second.body.request.rideId as string);
+  });
+
   it("rejects cancel after the ride is locked (MATCHED)", async () => {
     const banani = await getZoneId("Banani");
     const mohakhali = await getZoneId("Mohakhali");
 
+    const driverToken = await login("jashim@oitesla.test");
     const nusratToken = await login("nusrat@oitesla.test");
     const rafiqToken = await login("rafiq@oitesla.test");
     const shirinToken = await login("shirin@oitesla.test");
 
-    const setupRes = await createRideRequest(nusratToken, {
+    const setupRes = await createAndAcceptRideRequest(nusratToken, driverToken, {
       pickupZoneId: banani,
       destinationZoneId: mohakhali,
       type: "SHARED",
@@ -111,10 +149,11 @@ describe("PRD cancellation rules", () => {
     const banani = await getZoneId("Banani");
     const mohakhali = await getZoneId("Mohakhali");
 
+    const driverToken = await login("jashim@oitesla.test");
     const nusratToken = await login("nusrat@oitesla.test");
     const rafiqToken = await login("rafiq@oitesla.test");
 
-    const nusratRes = await createRideRequest(nusratToken, {
+    const nusratRes = await createAndAcceptRideRequest(nusratToken, driverToken, {
       pickupZoneId: banani,
       destinationZoneId: mohakhali,
       type: "SHARED",

@@ -63,6 +63,40 @@ export async function createRideRequest(
     .send(body);
 }
 
+export async function acceptRideRequest(driverToken: string, requestId: string) {
+  return request(app)
+    .post(`/api/driver/requests/${requestId}/accept`)
+    .set("Authorization", `Bearer ${driverToken}`);
+}
+
+/** Book, then accept when the request is still waiting. Joiners already on a ride are returned as-is. */
+export async function createAndAcceptRideRequest(
+  passengerToken: string,
+  driverToken: string,
+  body: {
+    pickupZoneId: number;
+    destinationZoneId: number;
+    type: "SOLO" | "SHARED";
+    seatsRequested: 1 | 2;
+    paymentMethod: "CASH" | "TESLAPAY";
+  },
+) {
+  const book = await createRideRequest(passengerToken, body);
+  if (book.status !== 201 || book.body.request.rideId) {
+    return book;
+  }
+
+  const accepted = await acceptRideRequest(driverToken, book.body.request.id as string);
+  if (accepted.status !== 200) {
+    return accepted;
+  }
+
+  return {
+    status: 201,
+    body: { request: accepted.body.request },
+  };
+}
+
 export async function cancelRideRequest(token: string, requestId: string) {
   return request(app)
     .post(`/api/ride-requests/${requestId}/cancel`)
@@ -156,4 +190,24 @@ export async function cleanupAllDemoRides() {
   ).map((ride) => ride.id);
 
   await cleanupRides(rideIds);
+
+  const orphanIds = (
+    await prisma.rideRequest.findMany({
+      where: {
+        rideId: null,
+        passenger: { user: { email: { in: demoEmails } } },
+      },
+      select: { id: true },
+    })
+  ).map((row) => row.id);
+
+  if (orphanIds.length > 0) {
+    await prisma.rideEvent.deleteMany({
+      where: { rideRequestId: { in: orphanIds } },
+    });
+    await prisma.payment.deleteMany({
+      where: { rideRequestId: { in: orphanIds } },
+    });
+    await prisma.rideRequest.deleteMany({ where: { id: { in: orphanIds } } });
+  }
 }

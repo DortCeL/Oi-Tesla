@@ -3,6 +3,7 @@ import { prisma } from "../src/db/prisma.js";
 import {
   cleanupAllDemoRides,
   cleanupRides,
+  createAndAcceptRideRequest,
   createRideRequest,
   driverArrive,
   driverComplete,
@@ -30,11 +31,12 @@ describe("PRD driver lifecycle", () => {
     const banani = await getZoneId("Banani");
     const mohakhali = await getZoneId("Mohakhali");
 
+    const driverToken = await login("jashim@oitesla.test");
     const nusratToken = await login("nusrat@oitesla.test");
     const rafiqToken = await login("rafiq@oitesla.test");
     const shirinToken = await login("shirin@oitesla.test");
 
-    await createRideRequest(nusratToken, {
+    await createAndAcceptRideRequest(nusratToken, driverToken, {
       pickupZoneId: banani,
       destinationZoneId: mohakhali,
       type: "SHARED",
@@ -103,7 +105,7 @@ describe("PRD driver lifecycle", () => {
     const driverToken = await login("jashim@oitesla.test");
     const nusratToken = await login("nusrat@oitesla.test");
 
-    const nusratRes = await createRideRequest(nusratToken, {
+    const nusratRes = await createAndAcceptRideRequest(nusratToken, driverToken, {
       pickupZoneId: banani,
       destinationZoneId: mohakhali,
       type: "SHARED",

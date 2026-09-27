@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "../src/db/prisma.js";
 import {
+  acceptRideRequest,
   app,
   cleanupAllDemoRides,
   cleanupRides,
@@ -31,6 +32,12 @@ describe("driver active zone matching", () => {
       .set("Authorization", `Bearer ${token}`);
   }
 
+  async function listRequests(token: string) {
+    return request(app)
+      .get("/api/driver/requests")
+      .set("Authorization", `Bearer ${token}`);
+  }
+
   it("does not match when driver is online in a different zone", async () => {
     const banani = await getZoneId("Banani");
     const mohakhali = await getZoneId("Mohakhali");
@@ -51,9 +58,16 @@ describe("driver active zone matching", () => {
     expect(res.status).toBe(201);
     expect(res.body.request.status).toBe("REQUESTED");
     expect(res.body.request.rideId).toBeNull();
+
+    const listed = await listRequests(driverToken);
+    expect(listed.status).toBe(200);
+    expect(listed.body.requests).toEqual([]);
+
+    const accept = await acceptRideRequest(driverToken, res.body.request.id as string);
+    expect(accept.status).toBe(400);
   });
 
-  it("matches when driver is online in the passenger pickup zone", async () => {
+  it("matches when the driver accepts a request in their pickup zone", async () => {
     const banani = await getZoneId("Banani");
     const mohakhali = await getZoneId("Mohakhali");
 
@@ -70,18 +84,27 @@ describe("driver active zone matching", () => {
     });
 
     expect(res.status).toBe(201);
-    expect(res.body.request.status).toBe("MATCHED");
-    expect(res.body.request.rideId).toBeTruthy();
-    trackedRideIds.add(res.body.request.rideId);
+    expect(res.body.request.status).toBe("REQUESTED");
+
+    const listed = await listRequests(driverToken);
+    expect(listed.body.requests.map((row: { id: string }) => row.id)).toContain(
+      res.body.request.id,
+    );
+
+    const accept = await acceptRideRequest(driverToken, res.body.request.id as string);
+    expect(accept.status).toBe(200);
+    expect(accept.body.request.status).toBe("MATCHED");
+    expect(accept.body.request.rideId).toBeTruthy();
+    trackedRideIds.add(accept.body.request.rideId);
 
     const ride = await prisma.ride.findUniqueOrThrow({
-      where: { id: res.body.request.rideId },
+      where: { id: accept.body.request.rideId },
     });
     expect(ride.driverId).toBeTruthy();
     expect(ride.seatsTaken).toBeLessThanOrEqual(ride.capacity);
   });
 
-  it("matches via poll when driver goes online in the pickup zone after booking", async () => {
+  it("stays waiting on poll until the driver accepts", async () => {
     const banani = await getZoneId("Banani");
     const mohakhali = await getZoneId("Mohakhali");
     const gulshan = await getZoneId("Gulshan 1");
@@ -107,6 +130,16 @@ describe("driver active zone matching", () => {
     expect(waitingPoll.body.ride).toBeNull();
 
     await setDriverOnline(driverToken, true, [banani, gulshan]);
+
+    const stillWaiting = await pollRequest(nusratToken, requestId);
+    expect(stillWaiting.body.request.status).toBe("REQUESTED");
+    expect(stillWaiting.body.ride).toBeNull();
+
+    const listed = await listRequests(driverToken);
+    expect(listed.body.requests.map((row: { id: string }) => row.id)).toContain(requestId);
+
+    const accept = await acceptRideRequest(driverToken, requestId);
+    expect(accept.status).toBe(200);
 
     const matchedPoll = await pollRequest(nusratToken, requestId);
     expect(matchedPoll.status).toBe(200);
@@ -134,7 +167,11 @@ describe("driver active zone matching", () => {
     });
 
     expect(res.status).toBe(201);
-    expect(res.body.request.status).toBe("MATCHED");
-    trackedRideIds.add(res.body.request.rideId);
+    expect(res.body.request.status).toBe("REQUESTED");
+
+    const accept = await acceptRideRequest(driverToken, res.body.request.id as string);
+    expect(accept.status).toBe(200);
+    expect(accept.body.request.status).toBe("MATCHED");
+    trackedRideIds.add(accept.body.request.rideId);
   });
 });
