@@ -33,6 +33,9 @@ export type RideRequest = {
   type: RideType;
   seatsRequested: number;
   paymentMethod: PaymentMethod;
+  baseFarePaisa: number;
+  distanceChargePaisa: number;
+  poolDiscountPaisa: number;
   farePaisa: number;
   rideId: string | null;
   pickupZone: Zone;

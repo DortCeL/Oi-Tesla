@@ -100,6 +100,12 @@ const activeRideStatuses: RideStatus[] = [
   RideStatus.IN_PROGRESS,
 ];
 
+const activeRequestStatuses: RequestStatus[] = [
+  RequestStatus.REQUESTED,
+  RequestStatus.MATCHED,
+  RequestStatus.IN_PROGRESS,
+];
+
 export async function getPassengerRideRequest(
   passengerId: string,
   requestId: string,
@@ -219,7 +225,10 @@ export async function getRideRequestPoolMates(
 
 export async function listPassengerRideRequests(passengerId: string) {
   const requests = await prisma.rideRequest.findMany({
-    where: { passengerId },
+    where: {
+      passengerId,
+      status: { in: activeRequestStatuses },
+    },
     include: rideRequestInclude,
     orderBy: { createdAt: "desc" },
   });

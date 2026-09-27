@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import request from "supertest";
 import { prisma } from "../src/db/prisma.js";
 import {
+  app,
   cancelRideRequest,
   cleanupAllDemoRides,
   cleanupRides,
@@ -63,6 +65,19 @@ describe("PRD cancellation rules", () => {
     });
     expect(poolRide.seatsTaken).toBe(1);
     expect(poolRide.status).toBe("WAITING");
+
+    const rafiqMine = await request(app)
+      .get("/api/ride-requests/mine")
+      .set("Authorization", `Bearer ${rafiqToken}`);
+    expect(rafiqMine.status).toBe(200);
+    expect(rafiqMine.body.requests).toEqual([]);
+
+    const nusratMine = await request(app)
+      .get("/api/ride-requests/mine")
+      .set("Authorization", `Bearer ${nusratToken}`);
+    expect(nusratMine.body.requests.map((row: { id: string }) => row.id)).toEqual([
+      nusratRes.body.request.id,
+    ]);
   });
 
   it("closes the ride when the last passenger cancels", async () => {
