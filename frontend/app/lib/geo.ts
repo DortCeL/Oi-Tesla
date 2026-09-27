@@ -6,6 +6,8 @@
  *              Farmgate
  *                 |
  *               Mirpur
+ *
+ * Main corridor runs Banani → Bashundhara. Mirpur joins at Mohakhali.
  */
 export const ZONE_NETWORK = [
   { name: "Banani", x: 70, y: 90 },
@@ -16,6 +18,7 @@ export const ZONE_NETWORK = [
   { name: "Mirpur", x: 190, y: 290 },
 ] as const;
 
+/** Undirected road segments between zones. */
 export const ZONE_ROADS: [string, string][] = [
   ["Banani", "Mohakhali"],
   ["Mohakhali", "Gulshan 1"],
@@ -24,4 +27,4 @@ export const ZONE_ROADS: [string, string][] = [
   ["Farmgate", "Mirpur"],
 ];
 
-export const MAP_VIEW = { width: 500, height: 360 } as const;
+export const MAP_VIEW = { width: 500, height: 360, pad: 28 } as const;
