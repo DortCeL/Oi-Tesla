@@ -43,7 +43,7 @@ describe("PRD rush-hour story", () => {
     });
 
     expect(nusratRes.status).toBe(201);
-    expect(nusratRes.body.request.farePaisa).toBe(4800);
+    expect(nusratRes.body.request.farePaisa).toBe(2400);
     expect(nusratRes.body.request.status).toBe("MATCHED");
 
     const poolRideId = nusratRes.body.request.rideId as string;
@@ -58,7 +58,7 @@ describe("PRD rush-hour story", () => {
     });
 
     expect(rafiqRes.status).toBe(201);
-    expect(rafiqRes.body.request.farePaisa).toBe(7200);
+    expect(rafiqRes.body.request.farePaisa).toBe(3600);
     expect(rafiqRes.body.request.rideId).toBe(poolRideId);
 
     const poolRide = await prisma.ride.findUniqueOrThrow({
@@ -67,5 +67,34 @@ describe("PRD rush-hour story", () => {
     expect(poolRide.seatsTaken).toBe(2);
     expect(poolRide.capacity).toBe(3);
     expect(poolRide.status).toBe("WAITING");
+  });
+
+  it("doubles a shared fare for two seats and keeps a reserved ride at one price", async () => {
+    const banani = await getZoneId("Banani");
+    const mohakhali = await getZoneId("Mohakhali");
+    const nusratToken = await login("nusrat@oitesla.test");
+    const rafiqToken = await login("rafiq@oitesla.test");
+
+    const shared = await createRideRequest(nusratToken, {
+      pickupZoneId: banani,
+      destinationZoneId: mohakhali,
+      type: "SHARED",
+      seatsRequested: 2,
+      paymentMethod: "CASH",
+    });
+    expect(shared.status).toBe(201);
+    expect(shared.body.request.farePaisa).toBe(4800);
+    expect(shared.body.request.poolDiscountPaisa).toBe(7200);
+
+    const solo = await createRideRequest(rafiqToken, {
+      pickupZoneId: banani,
+      destinationZoneId: mohakhali,
+      type: "SOLO",
+      seatsRequested: 2,
+      paymentMethod: "CASH",
+    });
+    expect(solo.status).toBe(201);
+    expect(solo.body.request.farePaisa).toBe(6000);
+    expect(solo.body.request.poolDiscountPaisa).toBe(0);
   });
 });

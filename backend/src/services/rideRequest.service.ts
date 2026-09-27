@@ -47,7 +47,7 @@ async function resolveFare(input: RideRequestEstimateInput) {
     input.destinationZoneId,
   );
 
-  return calculateFare(distanceM, input.type);
+  return calculateFare(distanceM, input.type, input.seatsRequested);
 }
 
 export async function estimateRideRequestFare(input: RideRequestEstimateInput) {
