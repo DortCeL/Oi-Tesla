@@ -8,6 +8,7 @@ import {
   completeRideHandler,
   getDriverRideHandler,
   listDriverRequestsHandler,
+  listDriverRideHistoryHandler,
   listDriverRidesHandler,
   markDriverArrivalHandler,
   startRideHandler,
@@ -39,6 +40,11 @@ driverRouter.get(
   "/rides",
   requireAuth([Role.DRIVER]),
   listDriverRidesHandler,
+);
+driverRouter.get(
+  "/rides/history",
+  requireAuth([Role.DRIVER]),
+  listDriverRideHistoryHandler,
 );
 driverRouter.get(
   "/rides/:rideId",

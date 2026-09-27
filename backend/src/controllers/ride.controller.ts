@@ -3,6 +3,7 @@ import { AppError } from "../middleware/errorHandler.js";
 import {
   completeRide,
   getDriverRideDetail,
+  listDriverRideHistory,
   listDriverRides,
   markDriverArrival,
   startRide,
@@ -42,6 +43,24 @@ export async function listDriverRidesHandler(
     }
 
     const rides = await listDriverRides(req.user.id);
+    res.json({ rides });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function listDriverRideHistoryHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    if (!req.user) {
+      next(new AppError(401, "Unauthorized"));
+      return;
+    }
+
+    const rides = await listDriverRideHistory(req.user.id);
     res.json({ rides });
   } catch (err) {
     next(err);
