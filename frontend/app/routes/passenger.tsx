@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Link, redirect, useLoaderData, useNavigate } from "react-router";
+import { redirect, useLoaderData, useNavigate } from "react-router";
 import type { Route } from "./+types/passenger";
+import { passengerNav } from "../components/TopNav";
 import { apiUrl } from "../lib/api";
-import { clearAuth, getAuth } from "../lib/auth.client";
+import { getAuth } from "../lib/auth.client";
 import { authFetch, authJson } from "../lib/fetch.client";
 import { formatPaisa } from "../lib/format";
 import type { FareEstimate, RideRequest, RideType, Zone } from "../lib/types";
@@ -105,11 +106,6 @@ export default function PassengerHome() {
     };
   }, [tripReady, pickupZoneId, destinationZoneId, type, seatsRequested]);
 
-  function logout() {
-    clearAuth();
-    void navigate("/login");
-  }
-
   async function handleBook(e: React.FormEvent) {
     e.preventDefault();
     if (!tripReady) return;
@@ -149,26 +145,10 @@ export default function PassengerHome() {
   }
 
   return (
-    <main className="mx-auto max-w-lg p-6 pt-16">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Hi, {name}</h1>
-        <div className="flex items-center gap-3">
-          <Link to="/passenger/history" className="text-sm text-blue-600">
-            History
-          </Link>
-          <Link to="/passenger/profile" className="text-sm text-blue-600">
-            Profile
-          </Link>
-          <Link to="/map" className="text-sm text-blue-600">
-            Route map
-          </Link>
-          <button type="button" onClick={logout} className="text-sm text-blue-600">
-            Logout
-          </button>
-        </div>
-      </div>
+    <main className="page">
+      {passengerNav(name)}
 
-      <form onSubmit={handleBook} className="mt-6 space-y-4">
+      <form onSubmit={handleBook} className="card space-y-4">
         <label className="block text-sm">
           Pickup
           <select
@@ -286,7 +266,7 @@ export default function PassengerHome() {
         <button
           type="submit"
           disabled={!tripReady || submitting}
-          className="w-full rounded bg-gray-900 py-2 text-white disabled:opacity-50"
+          className="btn-primary w-full disabled:opacity-50"
         >
           {submitting ? "Booking…" : "Book ride"}
         </button>

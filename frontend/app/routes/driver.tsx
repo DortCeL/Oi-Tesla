@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Link, redirect, useLoaderData, useNavigate } from "react-router";
+import { redirect, useLoaderData, useNavigate } from "react-router";
 import type { Route } from "./+types/driver";
+import { driverNav } from "../components/TopNav";
 import { apiUrl } from "../lib/api";
-import { clearAuth, getAuth } from "../lib/auth.client";
+import { getAuth } from "../lib/auth.client";
 import { authFetch, authJson } from "../lib/fetch.client";
 import { formatPaisa, formatRideType } from "../lib/format";
 import type { DriverRide, RideRequest, Zone } from "../lib/types";
@@ -116,11 +117,6 @@ export default function DriverHome() {
       window.clearInterval(id);
     };
   }, []);
-
-  function logout() {
-    clearAuth();
-    void navigate("/login");
-  }
 
   function toggleZone(zoneId: number) {
     setSelectedZones((current) =>
@@ -245,24 +241,8 @@ export default function DriverHome() {
   }
 
   return (
-    <main className="mx-auto max-w-lg p-6 pt-16">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Hi, {loaderData.name}</h1>
-        <div className="flex items-center gap-3">
-          <Link to="/driver/history" className="text-sm text-blue-600">
-            History
-          </Link>
-          <Link to="/driver/profile" className="text-sm text-blue-600">
-            Profile
-          </Link>
-          <Link to="/map" className="text-sm text-blue-600">
-            Route map
-          </Link>
-          <button type="button" onClick={logout} className="text-sm text-blue-600">
-            Logout
-          </button>
-        </div>
-      </div>
+    <main className="page">
+      {driverNav(loaderData.name)}
 
       {loaderData.tesla ? (
         <p className="mt-2 text-sm text-gray-600">
@@ -270,7 +250,7 @@ export default function DriverHome() {
         </p>
       ) : null}
 
-      <section className="mt-6 space-y-3 rounded border p-4">
+      <section className="card space-y-3">
         <p className="font-semibold">{isOnline ? "You are online" : "You are offline"}</p>
         <p className="text-sm text-gray-600">Pick the zones you can pick up from.</p>
         <ul className="space-y-2 text-sm">
@@ -293,7 +273,7 @@ export default function DriverHome() {
             type="button"
             disabled={saving}
             onClick={() => void (offlineQueued ? stayOnline() : saveStatus(false))}
-            className="w-full rounded border py-2"
+            className="btn-secondary w-full"
           >
             {saving
               ? "Updating…"
@@ -308,7 +288,7 @@ export default function DriverHome() {
             type="button"
             disabled={saving || selectedZones.length === 0}
             onClick={() => void saveStatus(true)}
-            className="w-full rounded bg-gray-900 py-2 text-white disabled:opacity-50"
+            className="btn-primary w-full disabled:opacity-50"
           >
             {saving ? "Updating…" : "Go online"}
           </button>
@@ -336,7 +316,7 @@ export default function DriverHome() {
               const busy = acceptingKey === stack.key || rides.length > 0 || offlineQueued;
               const overflow = stack.waitingCount - stack.acceptCount;
               return (
-                <li key={stack.key} className="rounded border p-4 text-sm">
+                <li key={stack.key} className="card text-sm">
                   <p className="text-base font-semibold">
                     {stack.pickupZone.name} → {stack.destinationZone.name}
                   </p>
@@ -371,7 +351,7 @@ export default function DriverHome() {
                     type="button"
                     disabled={busy}
                     onClick={() => void acceptStack(stack)}
-                    className="mt-3 w-full rounded bg-gray-900 py-2 text-white disabled:opacity-50"
+                    className="btn-primary mt-3 w-full disabled:opacity-50"
                   >
                     {acceptingKey === stack.key
                       ? "Accepting…"
@@ -404,7 +384,7 @@ export default function DriverHome() {
               const canStart = ride.status === "MATCHED" && ride.arrivedAt && !ride.startedAt;
               const canComplete = ride.status === "IN_PROGRESS" && !ride.completedAt;
               return (
-                <li key={ride.id} className="rounded border p-4 text-sm">
+                <li key={ride.id} className="card text-sm">
                   <p className="font-semibold">{ride.pickupZone.name}</p>
                   <p className="mt-1 text-gray-600">
                     {formatRideType(ride.type)} · {ride.seatsTaken}/{ride.capacity} seats ·{" "}
@@ -430,7 +410,7 @@ export default function DriverHome() {
                         type="button"
                         disabled={busy}
                         onClick={() => void lifecycle(ride.id, "arrive")}
-                        className="rounded bg-gray-900 py-2 text-white"
+                        className="btn-primary w-full"
                       >
                         {busy ? "Updating…" : "Mark arrived"}
                       </button>
@@ -440,7 +420,7 @@ export default function DriverHome() {
                         type="button"
                         disabled={busy}
                         onClick={() => void lifecycle(ride.id, "start")}
-                        className="rounded bg-gray-900 py-2 text-white"
+                        className="btn-primary w-full"
                       >
                         {busy ? "Updating…" : "Start ride"}
                       </button>
@@ -450,7 +430,7 @@ export default function DriverHome() {
                         type="button"
                         disabled={busy}
                         onClick={() => void lifecycle(ride.id, "complete")}
-                        className="rounded bg-gray-900 py-2 text-white"
+                        className="btn-primary w-full"
                       >
                         {busy ? "Updating…" : "Complete ride"}
                       </button>

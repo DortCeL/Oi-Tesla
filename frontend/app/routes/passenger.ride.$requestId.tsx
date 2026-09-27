@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { Link, redirect, useLoaderData, useNavigate } from "react-router";
+import { redirect, useLoaderData, useNavigate } from "react-router";
 import type { Route } from "./+types/passenger.ride.$requestId";
-import { clearAuth, getAuth } from "../lib/auth.client";
+import { passengerNav } from "../components/TopNav";
+import { getAuth } from "../lib/auth.client";
 import { authFetch, authJson } from "../lib/fetch.client";
 import { formatGender, formatPaisa, formatRideType } from "../lib/format";
 import type { PoolMate, RideRequest, RideSummary } from "../lib/types";
@@ -135,11 +136,6 @@ export default function PassengerRide() {
     }
   }
 
-  function logout() {
-    clearAuth();
-    void navigate("/login");
-  }
-
   const canCancel =
     data &&
     ["REQUESTED", "MATCHED"].includes(data.request.status) &&
@@ -148,30 +144,14 @@ export default function PassengerRide() {
   const req = data?.request;
 
   return (
-    <main className="mx-auto max-w-lg p-6 pt-16">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Hi, {name}</h1>
-        <div className="flex items-center gap-3">
-          <Link to="/passenger/history" className="text-sm text-blue-600">
-            History
-          </Link>
-          <Link to="/passenger/profile" className="text-sm text-blue-600">
-            Profile
-          </Link>
-          <Link to="/map" className="text-sm text-blue-600">
-            Route map
-          </Link>
-          <button type="button" onClick={logout} className="text-sm text-blue-600">
-            Logout
-          </button>
-        </div>
-      </div>
+    <main className="page">
+      {passengerNav(name)}
 
-      {!data && !error ? <p className="mt-6 text-sm text-gray-500">Loading ride…</p> : null}
+      {!data && !error ? <p className="text-sm text-gray-500">Loading ride…</p> : null}
       {error ? <p className="mt-6 text-sm text-red-600">{error}</p> : null}
 
       {data && req ? (
-        <section className="mt-6 space-y-4 rounded border p-4">
+        <section className="card space-y-4">
           <p className="font-semibold">Your trip</p>
           <p>
             {req.pickupZone.name} → {req.destinationZone.name}

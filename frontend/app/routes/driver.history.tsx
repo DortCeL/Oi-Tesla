@@ -1,6 +1,7 @@
-import { Link, redirect, useLoaderData, useNavigate } from "react-router";
+import { redirect, useLoaderData } from "react-router";
 import type { Route } from "./+types/driver.history";
-import { clearAuth, getAuth } from "../lib/auth.client";
+import { driverNav } from "../components/TopNav";
+import { getAuth } from "../lib/auth.client";
 import { authJson } from "../lib/fetch.client";
 import { formatPaisa, formatRideType } from "../lib/format";
 import type { DriverRide } from "../lib/types";
@@ -34,43 +35,21 @@ export async function clientLoader() {
 
 export default function DriverHistory() {
   const { name, rides } = useLoaderData<typeof clientLoader>();
-  const navigate = useNavigate();
-
-  function logout() {
-    clearAuth();
-    void navigate("/login");
-  }
 
   return (
-    <main className="mx-auto max-w-lg p-6 pt-16">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Hi, {name}</h1>
-        <div className="flex items-center gap-3">
-          <Link to="/driver" className="text-sm text-blue-600">
-            Rides
-          </Link>
-          <Link to="/driver/profile" className="text-sm text-blue-600">
-            Profile
-          </Link>
-          <Link to="/map" className="text-sm text-blue-600">
-            Route map
-          </Link>
-          <button type="button" onClick={logout} className="text-sm text-blue-600">
-            Logout
-          </button>
-        </div>
-      </div>
+    <main className="page">
+      {driverNav(name)}
 
-      <h2 className="mt-6 text-xl font-bold">Ride history</h2>
+      <h1 className="mb-4 text-2xl font-bold">Ride history</h1>
 
       {rides.length === 0 ? (
-        <p className="mt-4 rounded border p-4 text-sm text-gray-600">
+        <div className="card text-center text-gray-500">
           No completed or cancelled rides yet.
-        </p>
+        </div>
       ) : (
-        <ul className="mt-4 space-y-3">
+        <ul className="space-y-3">
           {rides.map((ride) => (
-            <li key={ride.id} className="rounded border p-4 text-sm">
+            <li key={ride.id} className="card text-sm">
               <div className="flex items-start justify-between gap-3">
                 <p className="font-semibold">Pickup · {ride.pickupZone.name}</p>
                 <p className="shrink-0 text-gray-600">{formatStatus(ride.status)}</p>

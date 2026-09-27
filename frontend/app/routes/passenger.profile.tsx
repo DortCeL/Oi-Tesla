@@ -1,5 +1,6 @@
-import { Link, redirect, useLoaderData } from "react-router";
+import { redirect, useLoaderData } from "react-router";
 import type { Route } from "./+types/passenger.profile";
+import { passengerNav } from "../components/TopNav";
 import { getAuth } from "../lib/auth.client";
 import { authJson } from "../lib/fetch.client";
 import { displayHobbies, displayOptional, formatGender } from "../lib/format";
@@ -27,20 +28,19 @@ export async function clientLoader() {
   }
 
   const { user } = await authJson<{ user: PassengerProfile }>("/auth/passenger/me");
-  return { user };
+  return { name: auth.name, user };
 }
 
 export default function PassengerProfilePage() {
-  const { user } = useLoaderData<typeof clientLoader>();
+  const { name, user } = useLoaderData<typeof clientLoader>();
 
   return (
-    <main className="mx-auto max-w-lg p-6 pt-16">
-      <Link to="/passenger" className="text-sm text-blue-600">
-        Back
-      </Link>
+    <main className="page">
+      {passengerNav(name)}
 
-      <h1 className="mt-4 text-2xl font-bold">Your profile</h1>
-      <p className="mt-1 text-sm text-gray-600">Read-only</p>
+      <div className="card">
+      <h1 className="text-xl font-bold">Your profile</h1>
+      <p className="mt-1 text-sm text-gray-500">Read-only</p>
 
       <dl className="mt-6 space-y-3 text-sm">
         <div>
@@ -72,6 +72,7 @@ export default function PassengerProfilePage() {
           <dd>{displayHobbies(user.hobbies)}</dd>
         </div>
       </dl>
+      </div>
     </main>
   );
 }

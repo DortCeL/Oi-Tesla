@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 import type { Route } from "./+types/map";
 import { StaticRouteMap } from "../components/StaticRouteMap";
+import { driverNav, passengerNav } from "../components/TopNav";
 import { getAuth } from "../lib/auth.client";
 
 export function meta({}: Route.MetaArgs) {
@@ -13,29 +14,33 @@ export async function clientLoader() {
 
 export default function MapPage({ loaderData }: Route.ComponentProps) {
   const { auth } = loaderData;
-  const backTo =
-    auth?.role === "PASSENGER" ? "/passenger" : auth?.role === "DRIVER" ? "/driver" : "/";
 
   return (
-    <main className="mx-auto max-w-lg p-6 pt-16">
-      <div className="flex items-center justify-between">
-        <Link to={backTo} className="text-sm text-blue-600">
-          Back
-        </Link>
-        {auth ? null : (
-          <Link to="/login" className="text-sm text-blue-600">
-            Sign in
-          </Link>
-        )}
-      </div>
+    <main className="page">
+      {auth?.role === "PASSENGER"
+        ? passengerNav(auth.name)
+        : auth?.role === "DRIVER"
+          ? driverNav(auth.name)
+          : (
+              <header className="mb-6 flex items-center justify-between">
+                <Link to="/" className="text-lg font-semibold text-gray-900">
+                  Oi Tesla
+                </Link>
+                <Link to="/login" className="text-sm text-emerald-700 hover:underline">
+                  Sign in
+                </Link>
+              </header>
+            )}
 
-      <h1 className="mt-4 text-2xl font-bold">Zone roadmap</h1>
-      <p className="mt-1 text-sm text-gray-600">
-        How the zones connect. This diagram does not move with a trip.
-      </p>
-      <div className="mt-6">
-        <StaticRouteMap />
-      </div>
+      <section className="card">
+        <h1 className="text-xl font-bold text-gray-900">Zone roadmap</h1>
+        <p className="mt-1 text-sm text-gray-600">
+          Static diagram of how zones connect. No live trip or distance overlay.
+        </p>
+        <div className="mt-6">
+          <StaticRouteMap />
+        </div>
+      </section>
     </main>
   );
 }

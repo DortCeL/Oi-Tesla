@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { Form, Link, redirect, useActionData } from "react-router";
 import type { Route } from "./+types/login";
+import { ChoiceTabs } from "../components/ChoiceTabs";
 import { apiUrl } from "../lib/api";
 import { getAuth, setAuth, type AuthRole } from "../lib/auth.client";
 
@@ -53,70 +55,65 @@ export async function clientAction({ request }: Route.ClientActionArgs) {
 
 export default function Login() {
   const actionData = useActionData<typeof clientAction>();
+  const [role, setRole] = useState<AuthRole>("PASSENGER");
 
   return (
-    <main className="mx-auto max-w-lg p-6 pt-16">
-      <h1 className="mb-6 text-2xl font-bold">Sign in</h1>
+    <main className="page">
+      <div className="card">
+        <h1 className="brand-title">Sign in</h1>
 
-      <Form method="post" className="space-y-4">
-        <div className="flex gap-4 text-sm">
-          <label className="flex items-center gap-2">
-            <input type="radio" name="role" value="PASSENGER" defaultChecked />
+        <Form method="post" className="mt-6 space-y-4">
+          <input type="hidden" name="role" value={role} />
+          <ChoiceTabs
+            label="I am a"
+            value={role}
+            onChange={(v) => setRole(v as AuthRole)}
+            options={[
+              { value: "PASSENGER", label: "Passenger" },
+              { value: "DRIVER", label: "Driver 🛺" },
+            ]}
+          />
+
+          <input
+            name="emailOrPhone"
+            placeholder="Email or phone"
+            required
+            autoComplete="username"
+            className="input"
+          />
+          <input
+            name="password"
+            type="password"
+            placeholder="Password"
+            required
+            autoComplete="current-password"
+            className="input"
+          />
+
+          {actionData?.error ? (
+            <p className="text-sm text-red-600">{actionData.error}</p>
+          ) : null}
+
+          <button type="submit" className="btn-primary w-full">
+            Sign in
+          </button>
+        </Form>
+
+        <p className="mt-6 text-sm text-gray-500">
+          No account?{" "}
+          <Link to="/signup/passenger" className="text-emerald-700">
             Passenger
-          </label>
-          <label className="flex items-center gap-2">
-            <input type="radio" name="role" value="DRIVER" />
+          </Link>{" "}
+          or{" "}
+          <Link to="/signup/driver" className="text-emerald-700">
             Driver
-          </label>
-        </div>
-
-        <input
-          name="emailOrPhone"
-          placeholder="Email or phone"
-          required
-          autoComplete="username"
-          className="w-full rounded border px-3 py-2"
-        />
-        <input
-          name="password"
-          type="password"
-          placeholder="Password"
-          required
-          autoComplete="current-password"
-          className="w-full rounded border px-3 py-2"
-        />
-
-        {actionData?.error ? (
-          <p className="text-sm text-red-600">{actionData.error}</p>
-        ) : null}
-
-        <button
-          type="submit"
-          className="w-full rounded bg-gray-900 py-2 text-white"
-        >
-          Sign in
-        </button>
-      </Form>
-
-      <p className="mt-6 text-sm text-gray-500">
-        No account?{" "}
-        <Link to="/signup/passenger" className="underline">
-          Passenger
-        </Link>{" "}
-        or{" "}
-        <Link to="/signup/driver" className="underline">
-          Driver
-        </Link>{" "}
-        signup
-      </p>
-      <p className="mt-4 text-sm">
-        <Link to="/map" className="text-blue-600">
-          Route map
-        </Link>
-      </p>
-      <p className="mt-2 text-sm text-gray-400">
-        Demo: nusrat@oitesla.test or jashim@oitesla.test — password123
-      </p>
+          </Link>{" "}
+          signup
+        </p>
+        <p className="mt-2 text-sm text-gray-400">
+          Demo: nusrat@oitesla.test or jashim@oitesla.test — password123
+        </p>
+      </div>
     </main>
   );
 }
