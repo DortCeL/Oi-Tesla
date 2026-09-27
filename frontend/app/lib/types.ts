@@ -7,6 +7,13 @@ export type RequestStatus =
   | "COMPLETED"
   | "CANCELLED";
 
+export type RideStatus =
+  | "WAITING"
+  | "MATCHED"
+  | "IN_PROGRESS"
+  | "COMPLETED"
+  | "CANCELLED";
+
 export type Zone = {
   id: number;
   name: string;
@@ -30,4 +37,16 @@ export type RideRequest = {
   rideId: string | null;
   pickupZone: Zone;
   destinationZone: Zone;
+};
+
+export type DriverRide = {
+  id: string;
+  type: RideType;
+  status: RideStatus;
+  capacity: number;
+  seatsTaken: number;
+  arrivedAt: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  pickupZone: Zone;
 };
