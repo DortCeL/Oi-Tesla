@@ -39,6 +39,16 @@ export type RideRequest = {
   destinationZone: Zone;
 };
 
+export type RideSummary = {
+  id: string;
+  status: RideStatus;
+  seatsTaken: number;
+  capacity: number;
+  arrivedAt: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+};
+
 export type DriverRide = {
   id: string;
   type: RideType;
