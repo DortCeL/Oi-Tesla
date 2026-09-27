@@ -358,6 +358,20 @@ export default function DriverHome() {
                     {formatRideType(ride.type)} · {ride.seatsTaken}/{ride.capacity} seats ·{" "}
                     {ride.status}
                   </p>
+                  <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    Your earnings
+                  </p>
+                  <p className="text-2xl font-bold">{formatPaisa(ride.totalFarePaisa ?? 0)}</p>
+                  {ride.passengers.length > 0 ? (
+                    <ul className="mt-2 space-y-1">
+                      {ride.passengers.map((passenger) => (
+                        <li key={passenger.name} className="flex justify-between gap-2">
+                          <span>{passenger.name}</span>
+                          <span className="font-semibold">{formatPaisa(passenger.farePaisa)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
                   <div className="mt-3 flex flex-col gap-2">
                     {canArrive ? (
                       <button

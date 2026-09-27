@@ -1,13 +1,47 @@
-import { RequestStatus, RideStatus } from "@prisma/client";
+import { Prisma, RequestStatus, RideStatus } from "@prisma/client";
 import { prisma } from "../db/prisma.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { toRideEventResponse } from "../utils/rideEventMapper.js";
 import { toRideResponse } from "../utils/rideMapper.js";
+import {
+  sumPassengerFares,
+  toDriverPassengerResponse,
+} from "../utils/ridePassengerMapper.js";
 import { recordRideEvent } from "./rideEvent.service.js";
 
 const rideInclude = {
   pickupZone: { select: { id: true, name: true } },
 } as const;
+
+const activePassengerStatuses: RequestStatus[] = [
+  RequestStatus.MATCHED,
+  RequestStatus.IN_PROGRESS,
+];
+
+const rideWithPassengersInclude = {
+  pickupZone: { select: { id: true, name: true } },
+  requests: {
+    where: { status: { in: activePassengerStatuses } },
+    include: {
+      passenger: {
+        include: {
+          user: { select: { name: true } },
+        },
+      },
+    },
+    orderBy: { createdAt: "asc" as const },
+  },
+} satisfies Prisma.RideInclude;
+
+function toDriverRideResponse(
+  ride: Prisma.RideGetPayload<{ include: typeof rideWithPassengersInclude }>,
+) {
+  return {
+    ...toRideResponse(ride),
+    totalFarePaisa: sumPassengerFares(ride.requests),
+    passengers: ride.requests.map(toDriverPassengerResponse),
+  };
+}
 
 async function getDriverRide(driverId: string, rideId: string) {
   const ride = await prisma.ride.findUnique({
@@ -25,15 +59,22 @@ async function getDriverRide(driverId: string, rideId: string) {
 export async function listDriverRides(driverId: string) {
   const rides = await prisma.ride.findMany({
     where: { driverId },
-    include: rideInclude,
+    include: rideWithPassengersInclude,
     orderBy: { createdAt: "desc" },
   });
 
-  return rides.map(toRideResponse);
+  return rides.map(toDriverRideResponse);
 }
 
 export async function getDriverRideDetail(driverId: string, rideId: string) {
-  const ride = await getDriverRide(driverId, rideId);
+  const ride = await prisma.ride.findUnique({
+    where: { id: rideId },
+    include: rideWithPassengersInclude,
+  });
+
+  if (!ride || ride.driverId !== driverId) {
+    throw new AppError(404, "Ride not found");
+  }
 
   const events = await prisma.rideEvent.findMany({
     where: { rideId },
@@ -41,7 +82,7 @@ export async function getDriverRideDetail(driverId: string, rideId: string) {
   });
 
   return {
-    ride: toRideResponse(ride),
+    ride: toDriverRideResponse(ride),
     events: events.map(toRideEventResponse),
   };
 }
@@ -69,11 +110,11 @@ export async function markDriverArrival(driverId: string, rideId: string) {
     return tx.ride.update({
       where: { id: rideId },
       data: { arrivedAt: new Date() },
-      include: rideInclude,
+      include: rideWithPassengersInclude,
     });
   });
 
-  return toRideResponse(updated);
+  return toDriverRideResponse(updated);
 }
 
 export async function startRide(driverId: string, rideId: string) {
@@ -125,11 +166,11 @@ export async function startRide(driverId: string, rideId: string) {
         status: RideStatus.IN_PROGRESS,
         startedAt: new Date(),
       },
-      include: rideInclude,
+      include: rideWithPassengersInclude,
     });
   });
 
-  return toRideResponse(updated);
+  return toDriverRideResponse(updated);
 }
 
 export async function completeRide(driverId: string, rideId: string) {
@@ -177,9 +218,9 @@ export async function completeRide(driverId: string, rideId: string) {
         status: RideStatus.COMPLETED,
         completedAt: new Date(),
       },
-      include: rideInclude,
+      include: rideWithPassengersInclude,
     });
   });
 
-  return toRideResponse(updated);
+  return toDriverRideResponse(updated);
 }

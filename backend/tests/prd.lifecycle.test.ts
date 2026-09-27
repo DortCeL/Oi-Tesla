@@ -66,7 +66,14 @@ describe("PRD driver lifecycle", () => {
   it("runs arrive → start → complete and updates all request statuses", async () => {
     const { rideId, driverToken } = await createLockedPoolRide();
 
-    expect((await driverArrive(driverToken, rideId)).status).toBe(200);
+    const arriveRes = await driverArrive(driverToken, rideId);
+    expect(arriveRes.status).toBe(200);
+    expect(arriveRes.body.ride.passengers).toHaveLength(3);
+    expect(arriveRes.body.ride.totalFarePaisa).toBe(2400 * 3);
+    expect(arriveRes.body.ride.passengers[0]).toEqual({
+      name: expect.any(String),
+      farePaisa: 2400,
+    });
     expect((await driverStart(driverToken, rideId)).status).toBe(200);
     expect((await driverComplete(driverToken, rideId)).status).toBe(200);
 

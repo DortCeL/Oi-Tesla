@@ -59,4 +59,6 @@ export type DriverRide = {
   startedAt: string | null;
   completedAt: string | null;
   pickupZone: Zone;
+  totalFarePaisa: number;
+  passengers: { name: string; farePaisa: number }[];
 };

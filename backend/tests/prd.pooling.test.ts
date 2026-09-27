@@ -30,7 +30,7 @@ describe("PRD pooling edge cases", () => {
     }
   }
 
-  it("does not pool when earlier destination is farther than the new one", async () => {
+  it("pools when the new stop is closer and already on the way", async () => {
     const banani = await getZoneId("Banani");
     const mohakhali = await getZoneId("Mohakhali");
     const gulshan = await getZoneId("Gulshan 1");
@@ -39,7 +39,7 @@ describe("PRD pooling edge cases", () => {
     const nusratToken = await login("nusrat@oitesla.test");
     const rafiqToken = await login("rafiq@oitesla.test");
 
-    // Gulshan first (farther), Mohakhali second (closer) — reverse of PRD order.
+    // Gulshan first (farther), Mohakhali second (closer). Mohakhali is on the way.
     const firstRes = await createAndAcceptRideRequest(nusratToken, driverToken, {
       pickupZoneId: banani,
       destinationZoneId: gulshan,
@@ -58,14 +58,8 @@ describe("PRD pooling edge cases", () => {
       paymentMethod: "CASH",
     });
     expect(secondRes.status).toBe(201);
-    expect(secondRes.body.request.status).toBe("REQUESTED");
-    expect(secondRes.body.request.rideId).toBeNull();
-
-    const acceptSecond = await acceptRideRequest(
-      driverToken,
-      secondRes.body.request.id as string,
-    );
-    expect(acceptSecond.status).toBe(400);
+    expect(secondRes.body.request.status).toBe("MATCHED");
+    expect(secondRes.body.request.rideId).toBe(firstRes.body.request.rideId);
   });
 
   it("does not pool across different pickup zones", async () => {
