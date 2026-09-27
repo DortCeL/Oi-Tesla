@@ -5,13 +5,44 @@ import { apiUrl } from "../lib/api";
 import { clearAuth, getAuth } from "../lib/auth.client";
 import { authFetch, authJson } from "../lib/fetch.client";
 import { formatPaisa, formatRideType } from "../lib/format";
-import type { FareEstimate, RideRequest, RideType, Zone } from "../lib/types";
+import type {
+  FareEstimate,
+  RideRequest,
+  RideSummary,
+  RideType,
+  Zone,
+} from "../lib/types";
+
+type RideLive = {
+  request: RideRequest;
+  ride: RideSummary | null;
+  driver: { name: string } | null;
+};
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: "Passenger · Oi Tesla" }];
 }
 
 const openStatuses = new Set(["REQUESTED", "MATCHED", "IN_PROGRESS"]);
+
+function describeRide(request: RideRequest, live: RideLive | null): string {
+  if (request.status === "CANCELLED") return "This request was cancelled.";
+  if (request.status === "COMPLETED" || live?.ride?.completedAt) return "Trip completed.";
+  if (request.status === "IN_PROGRESS" || live?.ride?.startedAt) return "You are on the way.";
+  if (live?.ride?.arrivedAt) return "Your driver has arrived at pickup.";
+  if (live?.ride?.status === "WAITING") {
+    return `Waiting for the pool to fill (${live.ride.seatsTaken}/${live.ride.capacity}).`;
+  }
+  if (request.status === "MATCHED" || live?.driver) return "Your driver is on the way to pickup.";
+  return "Waiting for a driver. This updates every few seconds.";
+}
+
+function canCancel(request: RideRequest, live: RideLive | null): boolean {
+  if (request.status === "COMPLETED" || request.status === "CANCELLED") return false;
+  if (request.status === "IN_PROGRESS" || live?.ride?.startedAt) return false;
+  if (live?.ride?.status === "MATCHED" || live?.ride?.arrivedAt) return false;
+  return true;
+}
 
 export async function clientLoader() {
   const auth = getAuth();
@@ -47,11 +78,41 @@ export default function PassengerHome() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [booked, setBooked] = useState<RideRequest | null>(active);
+  const [live, setLive] = useState<RideLive | null>(null);
 
   const tripReady =
     Boolean(pickupZoneId) &&
     Boolean(destinationZoneId) &&
     pickupZoneId !== destinationZoneId;
+
+  useEffect(() => {
+    if (!booked || booked.status === "COMPLETED" || booked.status === "CANCELLED") {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function poll() {
+      try {
+        const result = await authJson<RideLive>(`/ride-requests/${booked!.id}`);
+        if (cancelled) return;
+        setLive(result);
+        setBooked(result.request);
+      } catch (err) {
+        if (cancelled) return;
+        if (err instanceof Response && err.status === 401) {
+          void navigate("/login");
+        }
+      }
+    }
+
+    void poll();
+    const id = window.setInterval(() => void poll(), 3000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [booked?.id, booked?.status, navigate]);
 
   useEffect(() => {
     if (destinationZoneId && destinationZoneId === pickupZoneId) {
@@ -131,6 +192,7 @@ export default function PassengerHome() {
       }
       const { request } = (await res.json()) as { request: RideRequest };
       setBooked(request);
+      setLive(null);
     } catch (err) {
       if (err instanceof Response && err.status === 401) {
         void navigate("/login");
@@ -154,6 +216,7 @@ export default function PassengerHome() {
         throw new Error(err?.error ?? "Cancel failed");
       }
       setBooked(null);
+      setLive(null);
     } catch (err) {
       if (err instanceof Response && err.status === 401) {
         void navigate("/login");
@@ -182,14 +245,31 @@ export default function PassengerHome() {
             {formatRideType(booked.type)} · {booked.seatsRequested} seat
             {booked.seatsRequested === 1 ? "" : "s"} · {formatPaisa(booked.farePaisa)}
           </p>
-          <p className="text-sm text-gray-600">Status: {booked.status}</p>
-          <button
-            type="button"
-            onClick={() => void cancelBooked()}
-            className="text-sm text-red-600"
-          >
-            Cancel request
-          </button>
+          <p className="text-sm font-medium text-gray-800">{describeRide(booked, live)}</p>
+          {live?.driver ? (
+            <p className="text-sm text-gray-600">Driver: {live.driver.name}</p>
+          ) : null}
+          {canCancel(booked, live) ? (
+            <button
+              type="button"
+              onClick={() => void cancelBooked()}
+              className="text-sm text-red-600"
+            >
+              Cancel request
+            </button>
+          ) : null}
+          {booked.status === "COMPLETED" || booked.status === "CANCELLED" ? (
+            <button
+              type="button"
+              onClick={() => {
+                setBooked(null);
+                setLive(null);
+              }}
+              className="w-full rounded border py-2"
+            >
+              Book another ride
+            </button>
+          ) : null}
           {submitError ? <p className="text-sm text-red-600">{submitError}</p> : null}
         </section>
       ) : (
