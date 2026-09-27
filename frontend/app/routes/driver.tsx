@@ -221,6 +221,9 @@ export default function DriverHome() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Hi, {loaderData.name}</h1>
         <div className="flex items-center gap-3">
+          <Link to="/driver/profile" className="text-sm text-blue-600">
+            Profile
+          </Link>
           <Link to="/map" className="text-sm text-blue-600">
             Route map
           </Link>
