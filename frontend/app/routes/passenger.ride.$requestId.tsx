@@ -152,6 +152,9 @@ export default function PassengerRide() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Hi, {name}</h1>
         <div className="flex items-center gap-3">
+          <Link to="/passenger/history" className="text-sm text-blue-600">
+            History
+          </Link>
           <Link to="/passenger/profile" className="text-sm text-blue-600">
             Profile
           </Link>

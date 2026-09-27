@@ -38,6 +38,7 @@ export type RideRequest = {
   poolDiscountPaisa: number;
   farePaisa: number;
   rideId: string | null;
+  createdAt: string;
   pickupZone: Zone;
   destinationZone: Zone;
 };

@@ -7,6 +7,7 @@ import {
   estimateRideRequestHandler,
   getPassengerRideRequestHandler,
   getRideRequestPoolMatesHandler,
+  listPassengerRideHistoryHandler,
   listPassengerRideRequestsHandler,
 } from "../controllers/rideRequest.controller.js";
 
@@ -16,6 +17,11 @@ rideRequestRouter.get(
   "/mine",
   requireAuth([Role.PASSENGER]),
   listPassengerRideRequestsHandler,
+);
+rideRequestRouter.get(
+  "/history",
+  requireAuth([Role.PASSENGER]),
+  listPassengerRideHistoryHandler,
 );
 rideRequestRouter.post(
   "/estimate",

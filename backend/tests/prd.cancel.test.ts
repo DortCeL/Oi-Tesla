@@ -78,6 +78,15 @@ describe("PRD cancellation rules", () => {
     expect(nusratMine.body.requests.map((row: { id: string }) => row.id)).toEqual([
       nusratRes.body.request.id,
     ]);
+
+    const rafiqHistory = await request(app)
+      .get("/api/ride-requests/history")
+      .set("Authorization", `Bearer ${rafiqToken}`);
+    expect(rafiqHistory.status).toBe(200);
+    expect(rafiqHistory.body.requests.map((row: { id: string; status: string }) => ({
+      id: row.id,
+      status: row.status,
+    }))).toEqual([{ id: rafiqRequestId, status: "CANCELLED" }]);
   });
 
   it("closes the ride when the last passenger cancels", async () => {

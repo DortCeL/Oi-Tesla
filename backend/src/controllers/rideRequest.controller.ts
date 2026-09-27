@@ -6,6 +6,7 @@ import {
   estimateRideRequestFare,
   getPassengerRideRequest,
   getRideRequestPoolMates,
+  listPassengerRideHistory,
   listPassengerRideRequests,
 } from "../services/rideRequest.service.js";
 import {
@@ -94,6 +95,24 @@ export async function listPassengerRideRequestsHandler(
     }
 
     const requests = await listPassengerRideRequests(req.user.id);
+    res.json({ requests });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function listPassengerRideHistoryHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    if (!req.user) {
+      next(new AppError(401, "Unauthorized"));
+      return;
+    }
+
+    const requests = await listPassengerRideHistory(req.user.id);
     res.json({ requests });
   } catch (err) {
     next(err);

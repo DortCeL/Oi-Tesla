@@ -236,6 +236,20 @@ export async function listPassengerRideRequests(passengerId: string) {
   return requests.map(toRideRequestResponse);
 }
 
+export async function listPassengerRideHistory(passengerId: string) {
+  const requests = await prisma.rideRequest.findMany({
+    where: {
+      passengerId,
+      status: { in: [RequestStatus.COMPLETED, RequestStatus.CANCELLED] },
+    },
+    include: rideRequestInclude,
+    orderBy: { createdAt: "desc" },
+    take: 40,
+  });
+
+  return requests.map(toRideRequestResponse);
+}
+
 export async function cancelRideRequest(passengerId: string, requestId: string) {
   return prisma.$transaction(async (tx) => {
     const request = await tx.rideRequest.findUnique({
