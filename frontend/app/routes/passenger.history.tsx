@@ -1,16 +1,11 @@
 import { redirect, useLoaderData } from "react-router";
 import type { Route } from "./+types/passenger.history";
+import { StatusBadge } from "../components/StatusBadge";
 import { passengerNav } from "../components/TopNav";
 import { getAuth } from "../lib/auth.client";
 import { authJson } from "../lib/fetch.client";
 import { formatPaisa, formatRideType } from "../lib/format";
 import type { RideRequest } from "../lib/types";
-
-function formatStatus(status: string): string {
-  if (status === "COMPLETED") return "Completed";
-  if (status === "CANCELLED") return "Cancelled";
-  return status;
-}
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: "Ride history · Oi Tesla" }];
@@ -49,18 +44,22 @@ export default function PassengerHistory() {
       ) : (
         <ul className="space-y-3">
           {requests.map((req) => (
-            <li key={req.id} className="card text-sm">
+            <li key={req.id} className="card">
               <div className="flex items-start justify-between gap-3">
-                <p className="font-semibold">
-                  {req.pickupZone.name} → {req.destinationZone.name}
-                </p>
-                <p className="shrink-0 text-gray-600">{formatStatus(req.status)}</p>
+                <div>
+                  <p className="font-semibold text-gray-900">
+                    {req.pickupZone.name} → {req.destinationZone.name}
+                  </p>
+                  <p className="mt-1 text-sm text-gray-500">
+                    {formatRideType(req.type)} · {req.seatsRequested} seat
+                    {req.seatsRequested === 1 ? "" : "s"} · {formatPaisa(req.farePaisa)}
+                  </p>
+                  <p className="mt-1 text-xs text-gray-400">
+                    {new Date(req.createdAt).toLocaleString()}
+                  </p>
+                </div>
+                <StatusBadge status={req.status} />
               </div>
-              <p className="mt-1 text-gray-600">
-                {formatRideType(req.type)} · {req.seatsRequested} seat
-                {req.seatsRequested === 1 ? "" : "s"} · {formatPaisa(req.farePaisa)}
-              </p>
-              <p className="mt-1 text-gray-500">{new Date(req.createdAt).toLocaleString()}</p>
             </li>
           ))}
         </ul>

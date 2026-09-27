@@ -45,3 +45,51 @@ export function ChoiceTabs<T extends string | number>({
     </div>
   );
 }
+
+type MultiChoiceTabsProps = {
+  label?: string;
+  values: number[];
+  onChange: (values: number[]) => void;
+  options: { value: number; label: string }[];
+  disabled?: boolean;
+};
+
+export function MultiChoiceTabs({
+  label,
+  values,
+  onChange,
+  options,
+  disabled,
+}: MultiChoiceTabsProps) {
+  function toggle(id: number) {
+    if (values.includes(id)) {
+      onChange(values.filter((v) => v !== id));
+    } else {
+      onChange([...values, id]);
+    }
+  }
+
+  return (
+    <div>
+      {label ? (
+        <p className="mb-1.5 text-xs font-medium text-gray-600">{label}</p>
+      ) : null}
+      <div className="flex flex-wrap gap-1.5">
+        {options.map((opt) => {
+          const selected = values.includes(opt.value);
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              disabled={disabled}
+              onClick={() => toggle(opt.value)}
+              className={`${tabBase} ${selected ? tabSelected : tabIdle} disabled:opacity-50`}
+            >
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

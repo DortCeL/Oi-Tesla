@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { redirect, useLoaderData, useNavigate } from "react-router";
 import type { Route } from "./+types/passenger.ride.$requestId";
+import { DriverLiveBanner } from "../components/DriverLiveBanner";
+import { StatusBadge } from "../components/StatusBadge";
 import { passengerNav } from "../components/TopNav";
 import { getAuth } from "../lib/auth.client";
 import { authFetch, authJson } from "../lib/fetch.client";
@@ -12,18 +14,6 @@ type PollResult = {
   ride: RideSummary | null;
   driver: { name: string } | null;
 };
-
-function describeRide(result: PollResult): string {
-  const { request, ride } = result;
-  if (request.status === "COMPLETED" || ride?.completedAt) return "Trip completed.";
-  if (request.status === "IN_PROGRESS" || ride?.startedAt) return "You are on the way.";
-  if (ride?.arrivedAt) return "Your driver has arrived at pickup.";
-  if (ride?.status === "WAITING") {
-    return `Waiting for the pool to fill (${ride.seatsTaken}/${ride.capacity}).`;
-  }
-  if (request.status === "MATCHED" || result.driver) return "Your driver is on the way to pickup.";
-  return "Waiting for a driver. This updates every few seconds.";
-}
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: "Your ride · Oi Tesla" }];
@@ -151,64 +141,95 @@ export default function PassengerRide() {
       {error ? <p className="mt-6 text-sm text-red-600">{error}</p> : null}
 
       {data && req ? (
-        <section className="card space-y-4">
-          <p className="font-semibold">Your trip</p>
-          <p>
-            {req.pickupZone.name} → {req.destinationZone.name}
-          </p>
-          <p className="text-sm text-gray-600">
-            {formatRideType(req.type)} · {req.seatsRequested} seat
-            {req.seatsRequested === 1 ? "" : "s"}
-            {data.ride ? ` · pool ${data.ride.seatsTaken}/${data.ride.capacity}` : ""}
-          </p>
-          <p className="text-sm font-medium text-gray-800">{describeRide(data)}</p>
-          {data.driver ? (
-            <p className="text-sm text-gray-600">Driver: {data.driver.name}</p>
+        <div className="space-y-5">
+          {data.ride ? (
+            <DriverLiveBanner
+              driverName={data.driver?.name ?? null}
+              rideStatus={data.ride.status}
+              arrivedAt={data.ride.arrivedAt}
+              startedAt={data.ride.startedAt}
+            />
           ) : null}
 
-          <div className="rounded border bg-gray-50 p-4 text-sm">
-            <p className="text-gray-500">Your fare</p>
-            <p className="text-2xl font-bold">{formatPaisa(req.farePaisa)}</p>
-            <p className="mt-1 text-gray-600">
-              Pay by {req.paymentMethod === "TESLAPAY" ? "TeslaPay" : "cash"}
+          <div className="card">
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-bold">Your trip</h1>
+              <StatusBadge status={req.status} />
+            </div>
+            <p className="mt-2 text-lg font-semibold text-gray-900">
+              {req.pickupZone.name} → {req.destinationZone.name}
             </p>
-            <dl className="mt-3 space-y-1 border-t pt-3 text-gray-700">
-              <div className="flex justify-between gap-3">
-                <dt>Base fare</dt>
-                <dd>{formatPaisa(req.baseFarePaisa)}</dd>
-              </div>
-              <div className="flex justify-between gap-3">
-                <dt>Distance</dt>
-                <dd>{formatPaisa(req.distanceChargePaisa)}</dd>
-              </div>
-              {req.poolDiscountPaisa > 0 ? (
+            <p className="mt-1 text-sm text-gray-500">
+              {formatRideType(req.type)} · {req.seatsRequested} seat
+              {req.seatsRequested === 1 ? "" : "s"}
+              {data.ride ? ` · pool ${data.ride.seatsTaken}/${data.ride.capacity}` : ""}
+            </p>
+
+            <div className="mt-4 rounded-xl bg-emerald-50 p-4 ring-1 ring-emerald-100">
+              <p className="text-xs font-bold uppercase tracking-wide text-emerald-800">
+                Your fare
+              </p>
+              <p className="mt-1 text-3xl font-bold text-emerald-950">
+                {formatPaisa(req.farePaisa)}
+              </p>
+              <p className="mt-1 text-sm text-emerald-900/80">
+                Pay by {req.paymentMethod === "TESLAPAY" ? "TeslaPay" : "cash"}
+              </p>
+              <dl className="mt-3 space-y-1 border-t border-emerald-200/70 pt-3 text-sm text-emerald-950/80">
                 <div className="flex justify-between gap-3">
-                  <dt>Pool discount</dt>
-                  <dd>−{formatPaisa(req.poolDiscountPaisa)}</dd>
+                  <dt>Base fare</dt>
+                  <dd>{formatPaisa(req.baseFarePaisa)}</dd>
                 </div>
-              ) : null}
-            </dl>
+                <div className="flex justify-between gap-3">
+                  <dt>Distance</dt>
+                  <dd>{formatPaisa(req.distanceChargePaisa)}</dd>
+                </div>
+                {req.poolDiscountPaisa > 0 ? (
+                  <div className="flex justify-between gap-3 text-emerald-700">
+                    <dt>Pool discount</dt>
+                    <dd>−{formatPaisa(req.poolDiscountPaisa)}</dd>
+                  </div>
+                ) : null}
+              </dl>
+            </div>
           </div>
 
           {poolMates.length > 0 ? (
-            <div className="space-y-2 border-t pt-3">
-              <p className="text-sm font-semibold">Your pool mates</p>
-              <ul className="space-y-3">
+            <div className="card">
+              <p className="font-semibold text-gray-900">Your pool mates</p>
+              <p className="mt-1 text-sm text-gray-500">People sharing this Tesla with you</p>
+              <ul className="mt-4 space-y-3">
                 {poolMates.map((mate, index) => (
-                  <li key={`${mate.name}-${index}`} className="text-sm">
-                    <p className="font-medium">{mate.name}</p>
-                    <p className="text-gray-600">
-                      {formatGender(mate.gender)}
-                      {mate.occupation ? ` · ${mate.occupation}` : ""}
+                  <li
+                    key={`${mate.name}-${index}`}
+                    className="rounded-xl bg-gray-50 p-4 ring-1 ring-gray-100"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-lg font-semibold text-gray-900">{mate.name}</p>
+                        <p className="text-sm text-gray-500">
+                          {formatGender(mate.gender)}
+                          {mate.occupation ? ` · ${mate.occupation}` : ""}
+                        </p>
+                      </div>
+                      <p className="shrink-0 text-sm font-medium text-gray-700">
+                        {mate.seatsRequested} seat{mate.seatsRequested === 1 ? "" : "s"}
+                      </p>
+                    </div>
+                    <p className="mt-3 text-sm font-medium text-gray-800">
+                      Going to {mate.destinationZone.name}
                     </p>
-                    <p className="text-gray-800">Going to {mate.destinationZone.name}</p>
-                    <p className="text-gray-600">
+                    <p className="mt-1 text-sm text-gray-500">
                       {formatRideType(mate.type)} · their fare {formatPaisa(mate.farePaisa)} ·{" "}
                       {mate.paymentMethod === "TESLAPAY" ? "TeslaPay" : "Cash"}
                     </p>
-                    {mate.affiliation ? <p className="text-gray-600">{mate.affiliation}</p> : null}
+                    {mate.affiliation ? (
+                      <p className="mt-2 text-sm text-gray-600">{mate.affiliation}</p>
+                    ) : null}
                     {mate.hobbies.length > 0 ? (
-                      <p className="text-gray-600">Hobbies: {mate.hobbies.join(", ")}</p>
+                      <p className="mt-2 text-sm text-gray-600">
+                        Hobbies: {mate.hobbies.join(", ")}
+                      </p>
                     ) : null}
                   </li>
                 ))}
@@ -221,12 +242,12 @@ export default function PassengerRide() {
               type="button"
               onClick={() => void cancelRequest()}
               disabled={cancelling}
-              className="text-sm text-red-600 disabled:opacity-50"
+              className="btn-secondary w-full text-red-600"
             >
               {cancelling ? "Cancelling…" : "Cancel ride"}
             </button>
           ) : null}
-        </section>
+        </div>
       ) : null}
     </main>
   );

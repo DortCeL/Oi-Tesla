@@ -1,11 +1,17 @@
 import { useEffect, useState } from "react";
 import { redirect, useLoaderData, useNavigate } from "react-router";
 import type { Route } from "./+types/driver";
+import { MultiChoiceTabs } from "../components/ChoiceTabs";
+import { DriverRideBanner } from "../components/DriverRideBanner";
+import { PassengerList } from "../components/PassengerList";
+import { SeatMeter } from "../components/SeatMeter";
+import { StatusBadge } from "../components/StatusBadge";
 import { driverNav } from "../components/TopNav";
 import { apiUrl } from "../lib/api";
 import { getAuth } from "../lib/auth.client";
 import { authFetch, authJson } from "../lib/fetch.client";
 import { formatPaisa, formatRideType } from "../lib/format";
+import { describePoolFill } from "../lib/rideCopy";
 import type { DriverRide, RideRequest, Zone } from "../lib/types";
 
 type RequestStack = {
@@ -82,6 +88,7 @@ export default function DriverHome() {
   const [selectedZones, setSelectedZones] = useState<number[]>(loaderData.activeZoneIds);
   const [isOnline, setIsOnline] = useState(loaderData.isOnline);
   const [offlineQueued, setOfflineQueued] = useState(loaderData.offlineQueued);
+  const [zonesOpen, setZonesOpen] = useState(false);
   const [rides, setRides] = useState(loaderData.rides);
   const [stacks, setStacks] = useState<RequestStack[]>([]);
   const [saving, setSaving] = useState(false);
@@ -104,6 +111,9 @@ export default function DriverHome() {
           setStacks(open.stacks);
           setIsOnline(me.user.driver?.isOnline ?? false);
           setOfflineQueued(me.user.driver?.offlineQueued ?? false);
+          if (me.user.driver?.isOnline) {
+            setSelectedZones(me.user.driver.activeZoneIds ?? []);
+          }
         }
       } catch {
         // ignore a missed poll
@@ -117,14 +127,6 @@ export default function DriverHome() {
       window.clearInterval(id);
     };
   }, []);
-
-  function toggleZone(zoneId: number) {
-    setSelectedZones((current) =>
-      current.includes(zoneId)
-        ? current.filter((id) => id !== zoneId)
-        : [...current, zoneId],
-    );
-  }
 
   async function saveStatus(nextOnline: boolean) {
     setSaving(true);
@@ -145,6 +147,7 @@ export default function DriverHome() {
       setIsOnline(body.user.driver?.isOnline ?? nextOnline);
       setOfflineQueued(body.user.driver?.offlineQueued ?? false);
       setSelectedZones(body.user.driver?.activeZoneIds ?? []);
+      setZonesOpen(false);
     } catch (err) {
       if (err instanceof Response && err.status === 401) {
         void navigate("/login");
@@ -240,201 +243,227 @@ export default function DriverHome() {
     }
   }
 
+  const hasActiveRide = rides.length > 0;
+  const activeZoneNames = loaderData.zones
+    .filter((zone) => selectedZones.includes(zone.id))
+    .map((zone) => zone.name);
+  const zoneOptions = loaderData.zones.map((zone) => ({
+    value: zone.id,
+    label: zone.name,
+  }));
+
   return (
     <main className="page">
       {driverNav(loaderData.name)}
 
-      {loaderData.tesla ? (
-        <p className="mt-2 text-sm text-gray-600">
-          {loaderData.tesla.name} · {loaderData.tesla.capacity} seats
-        </p>
-      ) : null}
+      <section className={`card mb-6 ${hasActiveRide && isOnline ? "py-4" : ""}`}>
+        {hasActiveRide && isOnline ? (
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="status-signal-sm online" aria-hidden />
+              <div className="min-w-0">
+                <p className="font-semibold text-gray-900">Online</p>
+                {activeZoneNames.length > 0 ? (
+                  <p className="truncate text-xs text-emerald-800">
+                    {activeZoneNames.join(" · ")}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+            {!offlineQueued ? (
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => void saveStatus(false)}
+                className="btn-secondary shrink-0 px-3 py-1.5 text-xs"
+              >
+                Go offline after ride
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => void stayOnline()}
+                className="btn-secondary shrink-0 px-3 py-1.5 text-xs"
+              >
+                Stay online
+              </button>
+            )}
+          </div>
+        ) : (
+          <>
+            <div className="status-hero">
+              <span
+                className={`status-signal-lg ${isOnline ? "online" : "offline"}`}
+                aria-hidden
+              />
+              <h2 className="status-hero-title">
+                {isOnline ? "You are Online" : "You are Offline"}
+              </h2>
+            </div>
 
-      <section className="card space-y-3">
-        <p className="font-semibold">{isOnline ? "You are online" : "You are offline"}</p>
-        <p className="text-sm text-gray-600">Pick the zones you can pick up from.</p>
-        <ul className="space-y-2 text-sm">
-          {loaderData.zones.map((zone) => (
-            <li key={zone.id}>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={selectedZones.includes(zone.id)}
-                  onChange={() => toggleZone(zone.id)}
-                  disabled={isOnline || saving}
+            {isOnline && activeZoneNames.length > 0 ? (
+              <p className="mb-4 text-center text-sm font-medium text-emerald-800">
+                {activeZoneNames.join(" · ")}
+              </p>
+            ) : null}
+
+            {isOnline ? (
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => void saveStatus(false)}
+                className="btn-secondary w-full py-3 text-base font-semibold"
+              >
+                Go offline
+              </button>
+            ) : !zonesOpen ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedZones([]);
+                  setZonesOpen(true);
+                }}
+                className="btn-primary w-full py-3 text-base font-semibold"
+              >
+                Go online
+              </button>
+            ) : (
+              <div className="space-y-4 border-t border-gray-100 pt-5">
+                <MultiChoiceTabs
+                  label="Where can you pick up passengers?"
+                  values={selectedZones}
+                  onChange={setSelectedZones}
+                  options={zoneOptions}
                 />
-                {zone.name}
-              </label>
-            </li>
-          ))}
-        </ul>
-        {isOnline ? (
-          <button
-            type="button"
-            disabled={saving}
-            onClick={() => void (offlineQueued ? stayOnline() : saveStatus(false))}
-            className="btn-secondary w-full"
-          >
-            {saving
-              ? "Updating…"
-              : offlineQueued
-                ? "Stay online"
-                : rides.length > 0
-                  ? "Go offline after this ride"
-                  : "Go offline"}
-          </button>
-        ) : (
-          <button
-            type="button"
-            disabled={saving || selectedZones.length === 0}
-            onClick={() => void saveStatus(true)}
-            className="btn-primary w-full disabled:opacity-50"
-          >
-            {saving ? "Updating…" : "Go online"}
-          </button>
+                <button
+                  type="button"
+                  disabled={saving || selectedZones.length === 0}
+                  onClick={() => void saveStatus(true)}
+                  className="btn-primary w-full py-3 text-base font-semibold"
+                >
+                  {saving ? "Going online…" : "Confirm & go online"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setZonesOpen(false)}
+                  className="btn-secondary w-full"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+          </>
         )}
+
         {offlineQueued ? (
-          <p className="text-sm text-gray-700">
-            Going offline after this ride. Finish the trip, and you will not take a new one.
-          </p>
+          <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+            <p className="font-semibold">Going offline after this ride</p>
+            <p className="mt-0.5 text-xs text-amber-900/80">
+              Keep filling this pool and finish the trip. No new rides after that.
+              You will go offline automatically.
+            </p>
+          </div>
         ) : null}
+
+        {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
       </section>
 
-      {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
-
-      <section className="mt-6">
-        <h2 className="font-semibold">Incoming requests</h2>
-        {!isOnline ? (
-          <p className="mt-2 text-sm text-gray-600">Go online to see pickup requests.</p>
-        ) : stacks.length === 0 ? (
-          <p className="mt-2 text-sm text-gray-600">
-            No requests in your zones right now. Same pickup and destination stack together.
-          </p>
-        ) : (
-          <ul className="mt-3 space-y-3">
-            {stacks.map((stack) => {
-              const busy = acceptingKey === stack.key || rides.length > 0 || offlineQueued;
-              const overflow = stack.waitingCount - stack.acceptCount;
-              return (
-                <li key={stack.key} className="card text-sm">
-                  <p className="text-base font-semibold">
-                    {stack.pickupZone.name} → {stack.destinationZone.name}
-                  </p>
-                  <p className="mt-1 text-gray-600">
-                    {formatRideType(stack.type)} · {stack.acceptCount} of {stack.waitingCount}{" "}
-                    passenger{stack.waitingCount === 1 ? "" : "s"} · {stack.acceptSeats}/
-                    {stack.capacity} seats
-                    {overflow > 0 ? ` · ${overflow} wait for the next car` : ""}
-                  </p>
-                  <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    You earn
-                  </p>
-                  <p className="text-2xl font-bold">{formatPaisa(stack.totalFarePaisa)}</p>
-                  <ul className="mt-3 space-y-1">
-                    {stack.passengers.map((passenger) => {
-                      const included = stack.acceptRequestIds.includes(passenger.requestId);
-                      return (
-                        <li key={passenger.requestId} className="flex justify-between gap-2">
-                          <span className={included ? "" : "text-gray-400"}>
-                            {passenger.name}
-                            {passenger.seatsRequested > 1
-                              ? ` · ${passenger.seatsRequested} seats`
-                              : ""}
-                            {included ? "" : " · next car"}
-                          </span>
-                          <span className="font-semibold">{formatPaisa(passenger.farePaisa)}</span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => void acceptStack(stack)}
-                    className="btn-primary mt-3 w-full disabled:opacity-50"
-                  >
-                    {acceptingKey === stack.key
-                      ? "Accepting…"
-                      : offlineQueued
-                        ? "Going offline after this ride"
-                        : rides.length > 0
-                          ? "Finish your current ride first"
-                          : stack.acceptCount > 1
-                          ? `Accept pool · ${formatPaisa(stack.totalFarePaisa)}`
-                          : `Accept · ${formatPaisa(stack.totalFarePaisa)}`}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
-
-      <section className="mt-6">
-        <h2 className="font-semibold">Active rides</h2>
+      <section className="mb-6">
+        <h2 className="mb-3 text-lg font-semibold">Your Tesla right now</h2>
         {rides.length === 0 ? (
-          <p className="mt-2 text-sm text-gray-600">
-            No ride yet. Accept a request above to start one.
-          </p>
+          <div className="card text-center">
+            <p className="text-4xl" aria-hidden>
+              🛺
+            </p>
+            <p className="mt-2 font-medium text-gray-800">No passengers yet</p>
+            <p className="mt-1 text-sm text-gray-500">
+              Accept an incoming request below to start a ride.
+            </p>
+          </div>
         ) : (
-          <ul className="mt-3 space-y-3">
+          <ul className="space-y-4">
             {rides.map((ride) => {
-              const busy = actingRideId === ride.id;
               const canArrive = ride.status === "MATCHED" && !ride.arrivedAt;
-              const canStart = ride.status === "MATCHED" && ride.arrivedAt && !ride.startedAt;
+              const canStart =
+                ride.status === "MATCHED" && !!ride.arrivedAt && !ride.startedAt;
               const canComplete = ride.status === "IN_PROGRESS" && !ride.completedAt;
+              const busy = actingRideId === ride.id;
+              const hasAction = canArrive || canStart || canComplete;
+
               return (
-                <li key={ride.id} className="card text-sm">
-                  <p className="font-semibold">{ride.pickupZone.name}</p>
-                  <p className="mt-1 text-gray-600">
-                    {formatRideType(ride.type)} · {ride.seatsTaken}/{ride.capacity} seats ·{" "}
-                    {ride.status}
-                  </p>
-                  <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    Your earnings
-                  </p>
-                  <p className="text-2xl font-bold">{formatPaisa(ride.totalFarePaisa ?? 0)}</p>
-                  {ride.passengers.length > 0 ? (
-                    <ul className="mt-2 space-y-1">
-                      {ride.passengers.map((passenger) => (
-                        <li key={passenger.name} className="flex justify-between gap-2">
-                          <span>{passenger.name}</span>
-                          <span className="font-semibold">{formatPaisa(passenger.farePaisa)}</span>
-                        </li>
-                      ))}
-                    </ul>
+                <li key={ride.id} className="space-y-3">
+                  <DriverRideBanner ride={ride} />
+
+                  {hasAction ? (
+                    <div className="flex flex-col gap-2">
+                      {canArrive ? (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => void lifecycle(ride.id, "arrive")}
+                          className="btn-primary w-full py-3 text-base font-semibold"
+                        >
+                          {busy ? "Updating…" : "Mark arrived at pickup"}
+                        </button>
+                      ) : null}
+                      {canStart ? (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => void lifecycle(ride.id, "start")}
+                          className="btn-primary w-full py-3 text-base font-semibold"
+                        >
+                          {busy ? "Updating…" : "Start ride"}
+                        </button>
+                      ) : null}
+                      {canComplete ? (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => void lifecycle(ride.id, "complete")}
+                          className="btn-primary w-full py-3 text-base font-semibold"
+                        >
+                          {busy ? "Updating…" : "Complete ride"}
+                        </button>
+                      ) : null}
+                    </div>
                   ) : null}
-                  <div className="mt-3 flex flex-col gap-2">
-                    {canArrive ? (
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => void lifecycle(ride.id, "arrive")}
-                        className="btn-primary w-full"
-                      >
-                        {busy ? "Updating…" : "Mark arrived"}
-                      </button>
+
+                  <div className="card">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-emerald-800">Pickup</p>
+                        <p className="text-xl font-bold text-gray-900">{ride.pickupZone.name}</p>
+                        <p className="mt-1 text-sm text-gray-600">{describePoolFill(ride)}</p>
+                      </div>
+                      <StatusBadge status={ride.status} />
+                    </div>
+
+                    <div className="mt-4">
+                      <SeatMeter seatsTaken={ride.seatsTaken} capacity={ride.capacity} />
+                    </div>
+
+                    {(ride.totalFarePaisa ?? 0) > 0 ? (
+                      <div className="mt-4 rounded-xl bg-emerald-50 px-4 py-3 ring-1 ring-emerald-100">
+                        <p className="text-xs font-bold uppercase tracking-wide text-emerald-800">
+                          Your earnings
+                        </p>
+                        <p className="mt-0.5 text-2xl font-bold text-emerald-950">
+                          {formatPaisa(ride.totalFarePaisa ?? 0)}
+                        </p>
+                      </div>
                     ) : null}
-                    {canStart ? (
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => void lifecycle(ride.id, "start")}
-                        className="btn-primary w-full"
-                      >
-                        {busy ? "Updating…" : "Start ride"}
-                      </button>
-                    ) : null}
-                    {canComplete ? (
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => void lifecycle(ride.id, "complete")}
-                        className="btn-primary w-full"
-                      >
-                        {busy ? "Updating…" : "Complete ride"}
-                      </button>
-                    ) : null}
+
+                    <div className="mt-4">
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                        Passengers
+                      </p>
+                      <PassengerList
+                        passengers={ride.passengers ?? []}
+                        emptyMessage="Waiting for passengers to join…"
+                      />
+                    </div>
                   </div>
                 </li>
               );
@@ -442,6 +471,101 @@ export default function DriverHome() {
           </ul>
         )}
       </section>
+
+      {isOnline ? (
+        <section>
+          <h2 className="mb-3 text-lg font-semibold">Incoming routes</h2>
+          {stacks.length === 0 ? (
+            <div className="card text-sm text-gray-500">
+              No open requests in your zones. Same pickup and destination bookings stack
+              here so you can accept a pool in one tap.
+            </div>
+          ) : (
+            <ul className="space-y-3">
+              {stacks.map((stack) => {
+                const canAccept = rides.length === 0 && !offlineQueued;
+                const overflow =
+                  stack.waitingCount > stack.acceptCount
+                    ? stack.waitingCount - stack.acceptCount
+                    : 0;
+                return (
+                  <li key={stack.key} className="card">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xl font-bold text-gray-900">
+                          {stack.pickupZone.name} → {stack.destinationZone.name}
+                        </p>
+                        <p className="mt-1 text-sm text-gray-500">
+                          {formatRideType(stack.type)} · {stack.acceptCount} of{" "}
+                          {stack.waitingCount} passenger
+                          {stack.waitingCount === 1 ? "" : "s"} · {stack.acceptSeats}/
+                          {stack.capacity} seats
+                          {overflow > 0 ? ` · +${overflow} wait for next car` : ""}
+                        </p>
+                      </div>
+                      <span className="shrink-0 rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-bold text-white">
+                        {formatRideType(stack.type)}
+                      </span>
+                    </div>
+
+                    <div className="mt-4 rounded-xl bg-emerald-50 px-4 py-3 ring-1 ring-emerald-200">
+                      <p className="text-xs font-bold uppercase tracking-wide text-emerald-800">
+                        You earn if you accept
+                      </p>
+                      <p className="mt-0.5 text-3xl font-bold text-emerald-950">
+                        {formatPaisa(stack.totalFarePaisa)}
+                      </p>
+                    </div>
+
+                    <ul className="mt-3 space-y-1.5">
+                      {stack.passengers.map((passenger) => {
+                        const included = stack.acceptRequestIds.includes(passenger.requestId);
+                        return (
+                          <li
+                            key={passenger.requestId}
+                            className={[
+                              "flex items-center justify-between gap-2 text-sm",
+                              included ? "text-gray-900" : "text-gray-400",
+                            ].join(" ")}
+                          >
+                            <span>
+                              {passenger.name}
+                              {passenger.seatsRequested > 1
+                                ? ` · ${passenger.seatsRequested} seats`
+                                : ""}
+                              {included ? "" : " (next car)"}
+                            </span>
+                            <span className="font-semibold">
+                              {formatPaisa(passenger.farePaisa)}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+
+                    <button
+                      type="button"
+                      disabled={!canAccept || acceptingKey === stack.key}
+                      onClick={() => void acceptStack(stack)}
+                      className="btn-primary mt-4 w-full py-3 text-base font-semibold"
+                    >
+                      {acceptingKey === stack.key
+                        ? "Accepting…"
+                        : !canAccept
+                          ? rides.length > 0
+                            ? "Finish current ride first"
+                            : "Going offline after this ride"
+                          : stack.acceptCount > 1
+                            ? `Accept pool · ${formatPaisa(stack.totalFarePaisa)}`
+                            : `Accept · ${formatPaisa(stack.totalFarePaisa)}`}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+      ) : null}
     </main>
   );
 }
