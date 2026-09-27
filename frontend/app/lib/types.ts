@@ -49,6 +49,19 @@ export type RideSummary = {
   completedAt: string | null;
 };
 
+export type PoolMate = {
+  name: string;
+  gender: string;
+  hobbies: string[];
+  occupation: string | null;
+  affiliation: string | null;
+  seatsRequested: number;
+  type: RideType;
+  paymentMethod: PaymentMethod;
+  farePaisa: number;
+  destinationZone: Zone;
+};
+
 export type DriverRide = {
   id: string;
   type: RideType;
