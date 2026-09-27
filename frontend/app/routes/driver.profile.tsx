@@ -1,5 +1,6 @@
-import { Link, redirect, useLoaderData } from "react-router";
+import { redirect, useLoaderData } from "react-router";
 import type { Route } from "./+types/driver.profile";
+import { driverNav } from "../components/TopNav";
 import { getAuth } from "../lib/auth.client";
 import { authJson } from "../lib/fetch.client";
 import { formatGender } from "../lib/format";
@@ -26,21 +27,20 @@ export async function clientLoader() {
   }
 
   const { user } = await authJson<{ user: DriverProfile }>("/auth/driver/me");
-  return { user };
+  return { name: auth.name, user };
 }
 
 export default function DriverProfilePage() {
-  const { user } = useLoaderData<typeof clientLoader>();
+  const { name, user } = useLoaderData<typeof clientLoader>();
   const tesla = user.driver?.teslas.find((car) => car.isActive);
 
   return (
-    <main className="mx-auto max-w-lg p-6 pt-16">
-      <Link to="/driver" className="text-sm text-blue-600">
-        Back
-      </Link>
+    <main className="page">
+      {driverNav(name)}
 
-      <h1 className="mt-4 text-2xl font-bold">Your profile</h1>
-      <p className="mt-1 text-sm text-gray-600">Read-only</p>
+      <div className="card">
+      <h1 className="text-xl font-bold">Your profile</h1>
+      <p className="mt-1 text-sm text-gray-500">Read-only</p>
 
       <dl className="mt-6 space-y-3 text-sm">
         <div>
@@ -76,6 +76,7 @@ export default function DriverProfilePage() {
           <dd>{user.driver?.isOnline ? "Yes" : "No"}</dd>
         </div>
       </dl>
+      </div>
     </main>
   );
 }

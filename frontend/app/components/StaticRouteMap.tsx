@@ -17,10 +17,10 @@ export function StaticRouteMap() {
   const hub = byName.get("Mohakhali");
 
   return (
-    <div>
+    <div className="route-map">
       <svg
         viewBox={`0 0 ${width} ${height}`}
-        className="w-full rounded border bg-slate-50"
+        className="w-full overflow-visible rounded-2xl bg-slate-50 ring-1 ring-slate-200"
         role="img"
         aria-label="Dhaka Tesla Pool zone roadmap"
       >
@@ -31,28 +31,28 @@ export function StaticRouteMap() {
             y1={start.y}
             x2={end.x}
             y2={end.y}
-            stroke="#94a3b8"
-            strokeWidth={8}
-            strokeLinecap="round"
+            className="route-road-static"
           />
         ))}
 
-        {hub ? (
-          <circle cx={hub.x} cy={hub.y} r={18} fill="none" stroke="#059669" strokeWidth={2} />
-        ) : null}
+        {hub ? <circle cx={hub.x} cy={hub.y} r={18} className="route-junction" /> : null}
 
         {ZONE_NETWORK.map((zone) => {
           const isHub = zone.name === "Mohakhali";
           const labelBelow = zone.y > 150;
           return (
             <g key={zone.name}>
-              <circle cx={zone.x} cy={zone.y} r={isHub ? 9 : 7} fill={isHub ? "#047857" : "#0f172a"} />
+              <circle
+                cx={zone.x}
+                cy={zone.y}
+                r={isHub ? 9 : 7}
+                className={isHub ? "route-node-hub" : "route-node-static"}
+              />
               <text
                 x={zone.x}
                 y={labelBelow ? zone.y + 22 : zone.y - 14}
                 textAnchor="middle"
-                fontSize={13}
-                fill="#111827"
+                className="route-label-static"
               >
                 {zone.name}
               </text>
@@ -60,21 +60,6 @@ export function StaticRouteMap() {
           );
         })}
       </svg>
-
-      <div className="mt-4 space-y-2 text-sm text-gray-600">
-        <p>
-          <span className="font-semibold text-gray-900">Main road:</span> Banani → Mohakhali →
-          Gulshan 1 → Bashundhara
-        </p>
-        <p>
-          <span className="font-semibold text-gray-900">Side road:</span> Mirpur → Farmgate →
-          joins at Mohakhali
-        </p>
-        <p className="text-xs text-gray-500">
-          Mirpur to Bashundhara crosses Farmgate, Mohakhali, and Gulshan 1. Gulshan 1 is on the
-          Banani → Bashundhara road, so those trips can share a pool. Mirpur is not.
-        </p>
-      </div>
     </div>
   );
 }

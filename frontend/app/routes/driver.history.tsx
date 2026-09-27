@@ -1,15 +1,12 @@
-import { Link, redirect, useLoaderData, useNavigate } from "react-router";
+import { redirect, useLoaderData } from "react-router";
 import type { Route } from "./+types/driver.history";
-import { clearAuth, getAuth } from "../lib/auth.client";
+import { PassengerList } from "../components/PassengerList";
+import { StatusBadge } from "../components/StatusBadge";
+import { driverNav } from "../components/TopNav";
+import { getAuth } from "../lib/auth.client";
 import { authJson } from "../lib/fetch.client";
 import { formatPaisa, formatRideType } from "../lib/format";
 import type { DriverRide } from "../lib/types";
-
-function formatStatus(status: string): string {
-  if (status === "COMPLETED") return "Completed";
-  if (status === "CANCELLED") return "Cancelled";
-  return status;
-}
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: "Ride history · Oi Tesla" }];
@@ -34,61 +31,50 @@ export async function clientLoader() {
 
 export default function DriverHistory() {
   const { name, rides } = useLoaderData<typeof clientLoader>();
-  const navigate = useNavigate();
-
-  function logout() {
-    clearAuth();
-    void navigate("/login");
-  }
 
   return (
-    <main className="mx-auto max-w-lg p-6 pt-16">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Hi, {name}</h1>
-        <div className="flex items-center gap-3">
-          <Link to="/driver" className="text-sm text-blue-600">
-            Rides
-          </Link>
-          <Link to="/driver/profile" className="text-sm text-blue-600">
-            Profile
-          </Link>
-          <Link to="/map" className="text-sm text-blue-600">
-            Route map
-          </Link>
-          <button type="button" onClick={logout} className="text-sm text-blue-600">
-            Logout
-          </button>
-        </div>
-      </div>
+    <main className="page">
+      {driverNav(name)}
 
-      <h2 className="mt-6 text-xl font-bold">Ride history</h2>
+      <h1 className="mb-4 text-2xl font-bold">Ride history</h1>
 
       {rides.length === 0 ? (
-        <p className="mt-4 rounded border p-4 text-sm text-gray-600">
+        <div className="card text-center text-gray-500">
           No completed or cancelled rides yet.
-        </p>
+        </div>
       ) : (
-        <ul className="mt-4 space-y-3">
+        <ul className="space-y-3">
           {rides.map((ride) => (
-            <li key={ride.id} className="rounded border p-4 text-sm">
+            <li key={ride.id} className="card">
               <div className="flex items-start justify-between gap-3">
-                <p className="font-semibold">Pickup · {ride.pickupZone.name}</p>
-                <p className="shrink-0 text-gray-600">{formatStatus(ride.status)}</p>
+                <div>
+                  <p className="font-semibold text-gray-900">
+                    Pickup · {ride.pickupZone.name}
+                  </p>
+                  <p className="mt-1 text-sm text-gray-500">
+                    {formatRideType(ride.type)} · {ride.seatsTaken}/{ride.capacity} seats
+                    {ride.totalFarePaisa != null
+                      ? ` · earned ${formatPaisa(ride.totalFarePaisa)}`
+                      : ""}
+                  </p>
+                  <p className="mt-1 text-xs text-gray-400">
+                    {new Date(ride.createdAt).toLocaleString()}
+                  </p>
+                </div>
+                <StatusBadge status={ride.status} />
               </div>
-              <p className="mt-1 text-gray-600">
-                {formatRideType(ride.type)} · {ride.seatsTaken}/{ride.capacity} seats · earned{" "}
-                {formatPaisa(ride.totalFarePaisa)}
-              </p>
-              <p className="mt-1 text-gray-500">{new Date(ride.createdAt).toLocaleString()}</p>
-              {ride.passengers.length > 0 ? (
-                <ul className="mt-3 space-y-1 border-t pt-3">
-                  {ride.passengers.map((passenger, index) => (
-                    <li key={`${passenger.name}-${index}`} className="flex justify-between gap-3">
-                      <span>{passenger.name}</span>
-                      <span>{formatPaisa(passenger.farePaisa)}</span>
-                    </li>
-                  ))}
-                </ul>
+              {(ride.passengers?.length ?? 0) > 0 || (ride.totalFarePaisa ?? 0) > 0 ? (
+                <div className="mt-3 space-y-3 border-t border-gray-100 pt-3">
+                  {(ride.totalFarePaisa ?? 0) > 0 ? (
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-semibold text-gray-700">Your earnings</p>
+                      <p className="text-lg font-bold text-emerald-900">
+                        {formatPaisa(ride.totalFarePaisa ?? 0)}
+                      </p>
+                    </div>
+                  ) : null}
+                  <PassengerList passengers={ride.passengers ?? []} />
+                </div>
               ) : null}
             </li>
           ))}

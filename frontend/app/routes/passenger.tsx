@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
-import { Link, redirect, useLoaderData, useNavigate } from "react-router";
+import { redirect, useLoaderData, useNavigate } from "react-router";
 import type { Route } from "./+types/passenger";
+import { ChoiceTabs } from "../components/ChoiceTabs";
+import { passengerNav } from "../components/TopNav";
+import { ZoneSelect } from "../components/ZoneSelect";
 import { apiUrl } from "../lib/api";
-import { clearAuth, getAuth } from "../lib/auth.client";
+import { getAuth } from "../lib/auth.client";
 import { authFetch, authJson } from "../lib/fetch.client";
-import { formatPaisa } from "../lib/format";
+import { formatPaisa, formatRideType } from "../lib/format";
 import type { FareEstimate, RideRequest, RideType, Zone } from "../lib/types";
 
 export function meta({}: Route.MetaArgs) {
@@ -45,10 +48,20 @@ export default function PassengerHome() {
   const [type, setType] = useState<RideType>("SHARED");
   const [seatsRequested, setSeatsRequested] = useState<1 | 2>(1);
   const [paymentMethod, setPaymentMethod] = useState<"CASH" | "TESLAPAY">("CASH");
-  const [fare, setFare] = useState<FareEstimate | null>(null);
+  const [soloFare, setSoloFare] = useState<FareEstimate | null>(null);
+  const [sharedFare, setSharedFare] = useState<FareEstimate | null>(null);
   const [estimateError, setEstimateError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const zoneOptions = zones.map((zone) => ({
+    value: String(zone.id),
+    label: zone.name,
+  }));
+
+  const destinationOptions = zones
+    .filter((zone) => String(zone.id) !== pickupZoneId)
+    .map((zone) => ({ value: String(zone.id), label: zone.name }));
 
   const tripReady =
     Boolean(pickupZoneId) &&
@@ -63,7 +76,8 @@ export default function PassengerHome() {
 
   useEffect(() => {
     if (!tripReady) {
-      setFare(null);
+      setSoloFare(null);
+      setSharedFare(null);
       setEstimateError(null);
       return;
     }
@@ -72,43 +86,48 @@ export default function PassengerHome() {
     const destination = Number(destinationZoneId);
     let cancelled = false;
 
-    async function loadEstimate() {
+    async function loadEstimates() {
       setEstimateError(null);
       try {
-        const res = await authFetch("/ride-requests/estimate", {
-          method: "POST",
-          body: JSON.stringify({
-            pickupZoneId: pickup,
-            destinationZoneId: destination,
-            type,
-            seatsRequested,
+        const base = {
+          pickupZoneId: pickup,
+          destinationZoneId: destination,
+          seatsRequested,
+        };
+        const [soloRes, sharedRes] = await Promise.all([
+          authFetch("/ride-requests/estimate", {
+            method: "POST",
+            body: JSON.stringify({ ...base, type: "SOLO" }),
           }),
-        });
-        if (!res.ok) {
-          const err = (await res.json().catch(() => null)) as { error?: string } | null;
+          authFetch("/ride-requests/estimate", {
+            method: "POST",
+            body: JSON.stringify({ ...base, type: "SHARED" }),
+          }),
+        ]);
+
+        if (!soloRes.ok || !sharedRes.ok) {
+          const err = (await soloRes.json().catch(() => null)) as { error?: string } | null;
           throw new Error(err?.error ?? "Could not estimate fare");
         }
+
         if (!cancelled) {
-          setFare((await res.json()) as FareEstimate);
+          setSoloFare((await soloRes.json()) as FareEstimate);
+          setSharedFare((await sharedRes.json()) as FareEstimate);
         }
       } catch (err) {
         if (!cancelled) {
-          setFare(null);
+          setSoloFare(null);
+          setSharedFare(null);
           setEstimateError(err instanceof Error ? err.message : "Estimate failed");
         }
       }
     }
 
-    void loadEstimate();
+    void loadEstimates();
     return () => {
       cancelled = true;
     };
-  }, [tripReady, pickupZoneId, destinationZoneId, type, seatsRequested]);
-
-  function logout() {
-    clearAuth();
-    void navigate("/login");
-  }
+  }, [tripReady, pickupZoneId, destinationZoneId, seatsRequested]);
 
   async function handleBook(e: React.FormEvent) {
     e.preventDefault();
@@ -149,148 +168,94 @@ export default function PassengerHome() {
   }
 
   return (
-    <main className="mx-auto max-w-lg p-6 pt-16">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Hi, {name}</h1>
-        <div className="flex items-center gap-3">
-          <Link to="/passenger/history" className="text-sm text-blue-600">
-            History
-          </Link>
-          <Link to="/passenger/profile" className="text-sm text-blue-600">
-            Profile
-          </Link>
-          <Link to="/map" className="text-sm text-blue-600">
-            Route map
-          </Link>
-          <button type="button" onClick={logout} className="text-sm text-blue-600">
-            Logout
-          </button>
-        </div>
-      </div>
+    <main className="page">
+      {passengerNav(name)}
 
-      <form onSubmit={handleBook} className="mt-6 space-y-4">
-        <label className="block text-sm">
-          Pickup
-          <select
-            required
+      <section className="card">
+        <h2 className="text-2xl font-bold">Book a ride</h2>
+
+        <form onSubmit={handleBook} className="mt-5 space-y-5">
+          <ZoneSelect
+            label="Pickup zone"
             value={pickupZoneId}
-            onChange={(e) => setPickupZoneId(e.target.value)}
-            className="mt-1 w-full rounded border px-3 py-2"
-          >
-            <option value="">Choose pickup zone</option>
-            {zones.map((z) => (
-              <option key={z.id} value={z.id}>
-                {z.name}
-              </option>
-            ))}
-          </select>
-        </label>
+            onChange={setPickupZoneId}
+            options={zoneOptions}
+            placeholder="Choose pickup zone"
+          />
 
-        <label className="block text-sm">
-          Destination
-          <select
-            required
+          <ZoneSelect
+            label="Destination"
             value={destinationZoneId}
-            onChange={(e) => setDestinationZoneId(e.target.value)}
-            className="mt-1 w-full rounded border px-3 py-2"
+            onChange={setDestinationZoneId}
+            options={destinationOptions.length > 0 ? destinationOptions : zoneOptions}
+            placeholder="Choose destination"
+          />
+
+          <ChoiceTabs
+            label="Ride type"
+            value={type}
+            onChange={(next) => {
+              setType(next as RideType);
+              if (next === "SOLO") setSeatsRequested(1);
+            }}
+            options={[
+              { value: "SOLO", label: "Fully Reserved" },
+              { value: "SHARED", label: "Shared" },
+            ]}
+          />
+
+          <ChoiceTabs
+            label="Seats"
+            value={seatsRequested}
+            onChange={(next) => setSeatsRequested(next as 1 | 2)}
+            disabled={type === "SOLO"}
+            options={[
+              { value: 1, label: "1 seat" },
+              { value: 2, label: "2 seats" },
+            ]}
+          />
+
+          <ChoiceTabs
+            label="Payment"
+            value={paymentMethod}
+            onChange={(next) => setPaymentMethod(next as "CASH" | "TESLAPAY")}
+            options={[
+              { value: "CASH", label: "Cash" },
+              { value: "TESLAPAY", label: "TeslaPay" },
+            ]}
+          />
+
+          {tripReady && soloFare && sharedFare ? (
+            <div className="rounded-xl bg-emerald-50 p-4 text-sm ring-1 ring-emerald-100">
+              <p className="font-medium">Fare preview</p>
+              <p className="mt-1">Fully Reserved: {formatPaisa(soloFare.farePaisa)}</p>
+              <p>
+                Shared: {formatPaisa(sharedFare.farePaisa)}
+                {sharedFare.poolDiscountPaisa > 0
+                  ? ` (−${formatPaisa(sharedFare.poolDiscountPaisa)} pool discount)`
+                  : ""}
+              </p>
+              <p className="mt-2 text-gray-600">
+                Your selection ({formatRideType(type)}):{" "}
+                <strong>
+                  {formatPaisa(type === "SOLO" ? soloFare.farePaisa : sharedFare.farePaisa)}
+                </strong>
+              </p>
+            </div>
+          ) : null}
+
+          {estimateError ? <p className="text-sm text-red-600">{estimateError}</p> : null}
+          {submitError ? <p className="text-sm text-red-600">{submitError}</p> : null}
+
+          <button
+            type="submit"
+            disabled={!tripReady || submitting}
+            className="btn-primary w-full py-3 text-base font-semibold"
           >
-            <option value="">Choose destination</option>
-            {zones
-              .filter((z) => String(z.id) !== pickupZoneId)
-              .map((z) => (
-                <option key={z.id} value={z.id}>
-                  {z.name}
-                </option>
-              ))}
-          </select>
-        </label>
-
-        <div className="flex gap-4 text-sm">
-          <label className="flex items-center gap-2">
-            <input
-              type="radio"
-              name="type"
-              checked={type === "SHARED"}
-              onChange={() => setType("SHARED")}
-            />
-            Shared
-          </label>
-          <label className="flex items-center gap-2">
-            <input
-              type="radio"
-              name="type"
-              checked={type === "SOLO"}
-              onChange={() => {
-                setType("SOLO");
-                setSeatsRequested(1);
-              }}
-            />
-            Fully reserved
-          </label>
-        </div>
-
-        <div className="flex gap-4 text-sm">
-          <label className="flex items-center gap-2">
-            <input
-              type="radio"
-              name="seats"
-              checked={seatsRequested === 1}
-              onChange={() => setSeatsRequested(1)}
-            />
-            1 seat
-          </label>
-          <label className="flex items-center gap-2">
-            <input
-              type="radio"
-              name="seats"
-              checked={seatsRequested === 2}
-              disabled={type === "SOLO"}
-              onChange={() => setSeatsRequested(2)}
-            />
-            2 seats
-          </label>
-        </div>
-
-        <div className="flex gap-4 text-sm">
-          <label className="flex items-center gap-2">
-            <input
-              type="radio"
-              name="pay"
-              checked={paymentMethod === "CASH"}
-              onChange={() => setPaymentMethod("CASH")}
-            />
-            Cash
-          </label>
-          <label className="flex items-center gap-2">
-            <input
-              type="radio"
-              name="pay"
-              checked={paymentMethod === "TESLAPAY"}
-              onChange={() => setPaymentMethod("TESLAPAY")}
-            />
-            TeslaPay
-          </label>
-        </div>
-
-        {fare ? (
-          <p className="text-sm text-gray-700">
-            Fare: <strong>{formatPaisa(fare.farePaisa)}</strong>
-            {fare.poolDiscountPaisa > 0
-              ? ` (pool discount ${formatPaisa(fare.poolDiscountPaisa)})`
-              : ""}
-          </p>
-        ) : null}
-        {estimateError ? <p className="text-sm text-red-600">{estimateError}</p> : null}
-        {submitError ? <p className="text-sm text-red-600">{submitError}</p> : null}
-
-        <button
-          type="submit"
-          disabled={!tripReady || submitting}
-          className="w-full rounded bg-gray-900 py-2 text-white disabled:opacity-50"
-        >
-          {submitting ? "Booking…" : "Book ride"}
-        </button>
-      </form>
+            {submitting ? "Booking…" : "Book ride"}
+          </button>
+        </form>
+      </section>
     </main>
   );
 }

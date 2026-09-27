@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { Link, redirect, useLoaderData, useNavigate } from "react-router";
+import { redirect, useLoaderData, useNavigate } from "react-router";
 import type { Route } from "./+types/passenger.searching.$requestId";
-import { clearAuth, getAuth } from "../lib/auth.client";
+import { passengerNav } from "../components/TopNav";
+import { getAuth } from "../lib/auth.client";
 import { authFetch, authJson } from "../lib/fetch.client";
 import { formatPaisa, formatRideType } from "../lib/format";
 import type { RideRequest, RideSummary } from "../lib/types";
@@ -104,38 +105,17 @@ export default function PassengerSearching() {
     }
   }
 
-  function logout() {
-    clearAuth();
-    void navigate("/login");
-  }
-
   return (
-    <main className="mx-auto max-w-lg p-6 pt-16">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Hi, {name}</h1>
-        <div className="flex items-center gap-3">
-          <Link to="/passenger/history" className="text-sm text-blue-600">
-            History
-          </Link>
-          <Link to="/passenger/profile" className="text-sm text-blue-600">
-            Profile
-          </Link>
-          <Link to="/map" className="text-sm text-blue-600">
-            Route map
-          </Link>
-          <button type="button" onClick={logout} className="text-sm text-blue-600">
-            Logout
-          </button>
-        </div>
-      </div>
+    <main className="page">
+      {passengerNav(name)}
 
-      <section className="mt-6 rounded border p-6 text-center">
+      <section className="card text-center">
         <div className="mb-6 flex justify-center gap-2">
           {[0, 1, 2].map((dot) => (
             <span
               key={dot}
-              className="inline-block h-3 w-3 animate-bounce rounded-full bg-gray-900"
-              style={{ animationDelay: `${dot * 0.15}s` }}
+              className="search-dot inline-block h-3 w-3 rounded-full bg-emerald-600"
+              style={{ animationDelay: `${dot * 0.2}s` }}
             />
           ))}
         </div>

@@ -1,15 +1,11 @@
-import { Link, redirect, useLoaderData, useNavigate } from "react-router";
+import { redirect, useLoaderData } from "react-router";
 import type { Route } from "./+types/passenger.history";
-import { clearAuth, getAuth } from "../lib/auth.client";
+import { StatusBadge } from "../components/StatusBadge";
+import { passengerNav } from "../components/TopNav";
+import { getAuth } from "../lib/auth.client";
 import { authJson } from "../lib/fetch.client";
 import { formatPaisa, formatRideType } from "../lib/format";
 import type { RideRequest } from "../lib/types";
-
-function formatStatus(status: string): string {
-  if (status === "COMPLETED") return "Completed";
-  if (status === "CANCELLED") return "Cancelled";
-  return status;
-}
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: "Ride history · Oi Tesla" }];
@@ -34,54 +30,36 @@ export async function clientLoader() {
 
 export default function PassengerHistory() {
   const { name, requests } = useLoaderData<typeof clientLoader>();
-  const navigate = useNavigate();
-
-  function logout() {
-    clearAuth();
-    void navigate("/login");
-  }
 
   return (
-    <main className="mx-auto max-w-lg p-6 pt-16">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Hi, {name}</h1>
-        <div className="flex items-center gap-3">
-          <Link to="/passenger" className="text-sm text-blue-600">
-            Book
-          </Link>
-          <Link to="/passenger/profile" className="text-sm text-blue-600">
-            Profile
-          </Link>
-          <Link to="/map" className="text-sm text-blue-600">
-            Route map
-          </Link>
-          <button type="button" onClick={logout} className="text-sm text-blue-600">
-            Logout
-          </button>
-        </div>
-      </div>
+    <main className="page">
+      {passengerNav(name)}
 
-      <h2 className="mt-6 text-xl font-bold">Ride history</h2>
+      <h1 className="mb-4 text-2xl font-bold">Ride history</h1>
 
       {requests.length === 0 ? (
-        <p className="mt-4 rounded border p-4 text-sm text-gray-600">
-          No past rides yet. Book one from the booking page.
-        </p>
+        <div className="card text-center text-gray-500">
+          No past rides yet. Book one from the Book tab.
+        </div>
       ) : (
-        <ul className="mt-4 space-y-3">
+        <ul className="space-y-3">
           {requests.map((req) => (
-            <li key={req.id} className="rounded border p-4 text-sm">
+            <li key={req.id} className="card">
               <div className="flex items-start justify-between gap-3">
-                <p className="font-semibold">
-                  {req.pickupZone.name} → {req.destinationZone.name}
-                </p>
-                <p className="shrink-0 text-gray-600">{formatStatus(req.status)}</p>
+                <div>
+                  <p className="font-semibold text-gray-900">
+                    {req.pickupZone.name} → {req.destinationZone.name}
+                  </p>
+                  <p className="mt-1 text-sm text-gray-500">
+                    {formatRideType(req.type)} · {req.seatsRequested} seat
+                    {req.seatsRequested === 1 ? "" : "s"} · {formatPaisa(req.farePaisa)}
+                  </p>
+                  <p className="mt-1 text-xs text-gray-400">
+                    {new Date(req.createdAt).toLocaleString()}
+                  </p>
+                </div>
+                <StatusBadge status={req.status} />
               </div>
-              <p className="mt-1 text-gray-600">
-                {formatRideType(req.type)} · {req.seatsRequested} seat
-                {req.seatsRequested === 1 ? "" : "s"} · {formatPaisa(req.farePaisa)}
-              </p>
-              <p className="mt-1 text-gray-500">{new Date(req.createdAt).toLocaleString()}</p>
             </li>
           ))}
         </ul>

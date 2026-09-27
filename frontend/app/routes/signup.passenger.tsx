@@ -67,7 +67,7 @@ export default function SignupPassenger() {
       <h1 className="mb-2 text-2xl font-bold">Passenger signup</h1>
       <p className="mb-6 text-sm text-gray-500">
         Already have an account?{" "}
-        <Link to="/login" className="underline">
+        <Link to="/login" className="text-emerald-700">
           Sign in
         </Link>
       </p>
@@ -77,20 +77,20 @@ export default function SignupPassenger() {
           name="name"
           placeholder="Full name"
           required
-          className="w-full rounded border px-3 py-2"
+          className="input"
         />
         <input
           name="email"
           type="email"
           placeholder="Email"
           required
-          className="w-full rounded border px-3 py-2"
+          className="input"
         />
         <input
           name="phone"
           placeholder="Phone"
           required
-          className="w-full rounded border px-3 py-2"
+          className="input"
         />
         <input
           name="password"
@@ -98,7 +98,7 @@ export default function SignupPassenger() {
           placeholder="Password (min 8)"
           required
           minLength={8}
-          className="w-full rounded border px-3 py-2"
+          className="input"
         />
 
         <div className="flex gap-4 text-sm">
@@ -115,27 +115,24 @@ export default function SignupPassenger() {
         <input
           name="occupation"
           placeholder="Occupation (optional)"
-          className="w-full rounded border px-3 py-2"
+          className="input"
         />
         <input
           name="affiliation"
           placeholder="Affiliation (optional)"
-          className="w-full rounded border px-3 py-2"
+          className="input"
         />
         <input
           name="hobbies"
           placeholder="Hobbies, comma-separated (optional)"
-          className="w-full rounded border px-3 py-2"
+          className="input"
         />
 
         {actionData?.error ? (
           <p className="text-sm text-red-600">{actionData.error}</p>
         ) : null}
 
-        <button
-          type="submit"
-          className="w-full rounded bg-gray-900 py-2 text-white"
-        >
+        <button type="submit" className="btn-primary w-full">
           Create account
         </button>
       </Form>
