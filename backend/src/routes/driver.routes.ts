@@ -3,6 +3,7 @@ import { Role } from "@prisma/client";
 import { requireAuth } from "../middleware/auth.js";
 import { setDriverStatusHandler } from "../controllers/driver.controller.js";
 import {
+  acceptRequestStackHandler,
   acceptRideRequestHandler,
   completeRideHandler,
   getDriverRideHandler,
@@ -23,6 +24,11 @@ driverRouter.get(
   "/requests",
   requireAuth([Role.DRIVER]),
   listDriverRequestsHandler,
+);
+driverRouter.post(
+  "/request-stacks/accept",
+  requireAuth([Role.DRIVER]),
+  acceptRequestStackHandler,
 );
 driverRouter.post(
   "/requests/:requestId/accept",

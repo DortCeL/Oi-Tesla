@@ -8,9 +8,11 @@ import {
   startRide,
 } from "../services/ride.service.js";
 import {
+  acceptRequestStack,
   acceptRideRequest,
-  listOpenRideRequestsForDriver,
+  listOpenRequestStacksForDriver,
 } from "../services/pooling.service.js";
+import { acceptRequestStackSchema } from "../validators/driverRequest.validator.js";
 
 function getRequestIdParam(req: Request): string {
   const requestId = req.params.requestId;
@@ -129,8 +131,38 @@ export async function listDriverRequestsHandler(
       return;
     }
 
-    const requests = await listOpenRideRequestsForDriver(req.user.id);
-    res.json({ requests });
+    const stacks = await listOpenRequestStacksForDriver(req.user.id);
+    const requests = stacks.flatMap((stack) =>
+      stack.passengers.map((passenger) => ({
+        id: passenger.requestId,
+        type: stack.type,
+        seatsRequested: passenger.seatsRequested,
+        farePaisa: passenger.farePaisa,
+        pickupZone: stack.pickupZone,
+        destinationZone: stack.destinationZone,
+        passenger: { name: passenger.name },
+      })),
+    );
+    res.json({ stacks, requests });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function acceptRequestStackHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    if (!req.user) {
+      next(new AppError(401, "Unauthorized"));
+      return;
+    }
+
+    const input = acceptRequestStackSchema.parse(req.body);
+    const result = await acceptRequestStack(req.user.id, input);
+    res.json(result);
   } catch (err) {
     next(err);
   }

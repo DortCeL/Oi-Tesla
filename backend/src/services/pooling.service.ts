@@ -6,6 +6,7 @@
  *   otherwise stay REQUESTED until a driver accepts
  * Accept:
  *   the driver starts a new ride on their Tesla (or joins an open shared pool)
+ *   same pickup, destination, and type stack together; one accept takes who fits
  */
 import {
   Prisma,
@@ -322,13 +323,55 @@ export async function tryMatchRideRequest(requestId: string) {
   });
 }
 
-/** Open REQUESTED bookings in the driver's active zones. */
-export async function listOpenRideRequestsForDriver(driverId: string) {
+/**
+ * Pick which open requests fit on the Tesla when accepting a stack (FIFO).
+ * SOLO takes only the earliest request. SHARED packs until the seats are full.
+ */
+function selectFitRequests<
+  T extends { id: string; seatsRequested: number; farePaisa: number },
+>(type: RideType, capacity: number, ordered: T[]): T[] {
+  if (ordered.length === 0 || capacity <= 0) {
+    return [];
+  }
+
+  if (type === RideType.SOLO) {
+    return [ordered[0]];
+  }
+
+  const fit: T[] = [];
+  let seatsTaken = 0;
+  for (const req of ordered) {
+    if (!hasEnoughSeats(capacity, seatsTaken, req.seatsRequested)) {
+      continue;
+    }
+    fit.push(req);
+    seatsTaken += req.seatsRequested;
+    if (seatsTaken >= capacity) {
+      break;
+    }
+  }
+  return fit;
+}
+
+/** Open REQUESTED bookings grouped by pickup, destination, and ride type. */
+export async function listOpenRequestStacksForDriver(driverId: string) {
   const driver = await prisma.driver.findUnique({
     where: { userId: driverId },
+    include: {
+      teslas: {
+        where: { isActive: true },
+        orderBy: { capacity: "asc" },
+        take: 1,
+      },
+    },
   });
 
   if (!driver || !driver.isOnline || driver.activeZoneIds.length === 0) {
+    return [];
+  }
+
+  const capacity = driver.teslas[0]?.capacity ?? 0;
+  if (capacity === 0) {
     return [];
   }
 
@@ -347,10 +390,195 @@ export async function listOpenRideRequestsForDriver(driverId: string) {
     orderBy: { createdAt: "asc" },
   });
 
-  return requests.map((req) => ({
-    ...toRideRequestResponse(req),
-    passenger: { name: req.passenger.user.name },
-  }));
+  type StackBucket = {
+    pickupZone: { id: number; name: string };
+    destinationZone: { id: number; name: string };
+    type: RideType;
+    requests: typeof requests;
+  };
+
+  const buckets = new Map<string, StackBucket>();
+  for (const req of requests) {
+    const key = `${req.pickupZoneId}:${req.destinationZoneId}:${req.type}`;
+    const existing = buckets.get(key);
+    if (existing) {
+      existing.requests.push(req);
+    } else {
+      buckets.set(key, {
+        pickupZone: req.pickupZone,
+        destinationZone: req.destinationZone,
+        type: req.type,
+        requests: [req],
+      });
+    }
+  }
+
+  const stacks = [...buckets.values()].map((bucket) => {
+    const passengers = bucket.requests.map((req) => ({
+      requestId: req.id,
+      name: req.passenger.user.name,
+      farePaisa: req.farePaisa,
+      seatsRequested: req.seatsRequested,
+    }));
+
+    const fit = selectFitRequests(
+      bucket.type,
+      capacity,
+      bucket.requests.map((req) => ({
+        id: req.id,
+        seatsRequested: req.seatsRequested,
+        farePaisa: req.farePaisa,
+      })),
+    );
+
+    const waitingSeats = bucket.requests.reduce(
+      (sum, req) => sum + req.seatsRequested,
+      0,
+    );
+
+    return {
+      key: `${bucket.pickupZone.id}:${bucket.destinationZone.id}:${bucket.type}`,
+      pickupZone: bucket.pickupZone,
+      destinationZone: bucket.destinationZone,
+      type: bucket.type,
+      capacity,
+      waitingCount: bucket.requests.length,
+      waitingSeats,
+      passengers,
+      acceptCount: fit.length,
+      acceptSeats: fit.reduce((sum, req) => sum + req.seatsRequested, 0),
+      totalFarePaisa: fit.reduce((sum, req) => sum + req.farePaisa, 0),
+      acceptRequestIds: fit.map((req) => req.id),
+    };
+  });
+
+  stacks.sort((a, b) => b.totalFarePaisa - a.totalFarePaisa);
+  return stacks;
+}
+
+export type AcceptStackInput = {
+  pickupZoneId: number;
+  destinationZoneId: number;
+  type: RideType;
+};
+
+/** Accept one stack: start a ride and match every request that fits. */
+export async function acceptRequestStack(driverId: string, input: AcceptStackInput) {
+  return prisma.$transaction(async (tx) => {
+    const driver = await tx.driver.findUnique({
+      where: { userId: driverId },
+      include: {
+        teslas: {
+          where: { isActive: true },
+          orderBy: { capacity: "asc" },
+          take: 1,
+        },
+      },
+    });
+
+    const tesla = driver?.teslas[0];
+    if (!driver || !tesla) {
+      throw new AppError(400, "No suitable Tesla available");
+    }
+    if (!driver.isOnline) {
+      throw new AppError(400, "Go online before accepting requests");
+    }
+    if (!driver.activeZoneIds.includes(input.pickupZoneId)) {
+      throw new AppError(400, "Pickup zone is outside your active zones");
+    }
+
+    const activeCount = await tx.ride.count({
+      where: {
+        driverId,
+        status: { in: activeDriverRideStatuses },
+      },
+    });
+    if (activeCount > 0) {
+      throw new AppError(400, "Finish your current ride before accepting another");
+    }
+
+    const open = await tx.rideRequest.findMany({
+      where: {
+        status: RequestStatus.REQUESTED,
+        rideId: null,
+        pickupZoneId: input.pickupZoneId,
+        destinationZoneId: input.destinationZoneId,
+        type: input.type,
+      },
+      orderBy: { createdAt: "asc" },
+    });
+
+    if (open.length === 0) {
+      throw new AppError(400, "No open requests on this route");
+    }
+
+    await tx.$queryRaw`
+      SELECT id FROM ride_requests
+      WHERE id IN (${Prisma.join(open.map((req) => req.id))})
+      FOR UPDATE
+    `;
+
+    const locked = await tx.rideRequest.findMany({
+      where: {
+        id: { in: open.map((req) => req.id) },
+        status: RequestStatus.REQUESTED,
+        rideId: null,
+      },
+      orderBy: { createdAt: "asc" },
+    });
+
+    if (locked.length === 0) {
+      throw new AppError(400, "No open requests on this route");
+    }
+
+    const fit = selectFitRequests(
+      input.type,
+      tesla.capacity,
+      locked.map((req) => ({
+        id: req.id,
+        seatsRequested: req.seatsRequested,
+        farePaisa: req.farePaisa,
+      })),
+    );
+
+    if (fit.length === 0) {
+      throw new AppError(400, "No requests fit your Tesla capacity");
+    }
+
+    const byId = new Map(locked.map((req) => [req.id, req]));
+    const first = byId.get(fit[0].id);
+    if (!first) {
+      throw new AppError(400, "No open requests on this route");
+    }
+
+    const acceptedFirst = await createRideOnDriver(tx, first, driverId);
+    const rideId = acceptedFirst.rideId;
+    if (!rideId) {
+      throw new AppError(500, "Ride was not created");
+    }
+
+    for (const next of fit.slice(1)) {
+      const req = byId.get(next.id);
+      if (!req) continue;
+      const fresh = await tx.rideRequest.findUnique({ where: { id: req.id } });
+      if (!fresh || fresh.status !== RequestStatus.REQUESTED || fresh.rideId) {
+        continue;
+      }
+      await attachRequestToRide(tx, fresh, rideId);
+    }
+
+    const matched = await tx.rideRequest.findMany({
+      where: { id: { in: fit.map((item) => item.id) }, rideId },
+      include: rideRequestInclude,
+      orderBy: { createdAt: "asc" },
+    });
+
+    return {
+      requests: matched.map(toRideRequestResponse),
+      rideId,
+      totalFarePaisa: matched.reduce((sum, req) => sum + req.farePaisa, 0),
+    };
+  });
 }
 
 /** Driver accepts a REQUESTED booking and starts a ride on their Tesla. */
