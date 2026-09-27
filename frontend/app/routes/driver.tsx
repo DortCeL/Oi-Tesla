@@ -7,8 +7,23 @@ import { authFetch, authJson } from "../lib/fetch.client";
 import { formatPaisa, formatRideType } from "../lib/format";
 import type { DriverRide, RideRequest, Zone } from "../lib/types";
 
-type IncomingRequest = RideRequest & {
-  passenger: { name: string };
+type RequestStack = {
+  key: string;
+  pickupZone: Zone;
+  destinationZone: Zone;
+  type: RideRequest["type"];
+  capacity: number;
+  waitingCount: number;
+  acceptCount: number;
+  acceptSeats: number;
+  totalFarePaisa: number;
+  acceptRequestIds: string[];
+  passengers: {
+    requestId: string;
+    name: string;
+    farePaisa: number;
+    seatsRequested: number;
+  }[];
 };
 
 type DriverProfile = {
@@ -64,10 +79,10 @@ export default function DriverHome() {
   const [selectedZones, setSelectedZones] = useState<number[]>(loaderData.activeZoneIds);
   const [isOnline, setIsOnline] = useState(loaderData.isOnline);
   const [rides, setRides] = useState(loaderData.rides);
-  const [incoming, setIncoming] = useState<IncomingRequest[]>([]);
+  const [stacks, setStacks] = useState<RequestStack[]>([]);
   const [saving, setSaving] = useState(false);
   const [actingRideId, setActingRideId] = useState<string | null>(null);
-  const [acceptingId, setAcceptingId] = useState<string | null>(null);
+  const [acceptingKey, setAcceptingKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -77,11 +92,11 @@ export default function DriverHome() {
       try {
         const [list, open] = await Promise.all([
           authJson<{ rides: DriverRide[] }>("/driver/rides"),
-          authJson<{ requests: IncomingRequest[] }>("/driver/requests"),
+          authJson<{ stacks: RequestStack[] }>("/driver/requests"),
         ]);
         if (!cancelled) {
           setRides(list.rides.filter(isActiveRide));
-          setIncoming(open.requests);
+          setStacks(open.stacks);
         }
       } catch {
         // ignore a missed poll
@@ -140,20 +155,28 @@ export default function DriverHome() {
     }
   }
 
-  async function acceptRequest(requestId: string) {
-    setAcceptingId(requestId);
+  async function acceptStack(stack: RequestStack) {
+    setAcceptingKey(stack.key);
     setError(null);
     try {
-      const res = await authFetch(`/driver/requests/${requestId}/accept`, {
+      const res = await authFetch("/driver/request-stacks/accept", {
         method: "POST",
+        body: JSON.stringify({
+          pickupZoneId: stack.pickupZone.id,
+          destinationZoneId: stack.destinationZone.id,
+          type: stack.type,
+        }),
       });
       if (!res.ok) {
         const err = (await res.json().catch(() => null)) as { error?: string } | null;
         throw new Error(err?.error ?? "Could not accept");
       }
-      setIncoming((current) => current.filter((req) => req.id !== requestId));
-      const list = await authJson<{ rides: DriverRide[] }>("/driver/rides");
+      const [list, open] = await Promise.all([
+        authJson<{ rides: DriverRide[] }>("/driver/rides"),
+        authJson<{ stacks: RequestStack[] }>("/driver/requests"),
+      ]);
       setRides(list.rides.filter(isActiveRide));
+      setStacks(open.stacks);
     } catch (err) {
       if (err instanceof Response && err.status === 401) {
         void navigate("/login");
@@ -161,7 +184,7 @@ export default function DriverHome() {
       }
       setError(err instanceof Error ? err.message : "Could not accept");
     } finally {
-      setAcceptingId(null);
+      setAcceptingKey(null);
     }
   }
 
@@ -253,33 +276,60 @@ export default function DriverHome() {
         <h2 className="font-semibold">Incoming requests</h2>
         {!isOnline ? (
           <p className="mt-2 text-sm text-gray-600">Go online to see pickup requests.</p>
-        ) : incoming.length === 0 ? (
-          <p className="mt-2 text-sm text-gray-600">No requests in your zones right now.</p>
+        ) : stacks.length === 0 ? (
+          <p className="mt-2 text-sm text-gray-600">
+            No requests in your zones right now. Same pickup and destination stack together.
+          </p>
         ) : (
           <ul className="mt-3 space-y-3">
-            {incoming.map((req) => {
-              const busy = acceptingId === req.id || rides.length > 0;
+            {stacks.map((stack) => {
+              const busy = acceptingKey === stack.key || rides.length > 0;
+              const overflow = stack.waitingCount - stack.acceptCount;
               return (
-                <li key={req.id} className="rounded border p-4 text-sm">
-                  <p className="font-semibold">{req.passenger.name}</p>
+                <li key={stack.key} className="rounded border p-4 text-sm">
+                  <p className="text-base font-semibold">
+                    {stack.pickupZone.name} → {stack.destinationZone.name}
+                  </p>
                   <p className="mt-1 text-gray-600">
-                    {req.pickupZone.name} → {req.destinationZone.name}
+                    {formatRideType(stack.type)} · {stack.acceptCount} of {stack.waitingCount}{" "}
+                    passenger{stack.waitingCount === 1 ? "" : "s"} · {stack.acceptSeats}/
+                    {stack.capacity} seats
+                    {overflow > 0 ? ` · ${overflow} wait for the next car` : ""}
                   </p>
-                  <p className="mt-1">
-                    {formatRideType(req.type)} · {req.seatsRequested} seat
-                    {req.seatsRequested === 1 ? "" : "s"} · {formatPaisa(req.farePaisa)}
+                  <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    You earn
                   </p>
+                  <p className="text-2xl font-bold">{formatPaisa(stack.totalFarePaisa)}</p>
+                  <ul className="mt-3 space-y-1">
+                    {stack.passengers.map((passenger) => {
+                      const included = stack.acceptRequestIds.includes(passenger.requestId);
+                      return (
+                        <li key={passenger.requestId} className="flex justify-between gap-2">
+                          <span className={included ? "" : "text-gray-400"}>
+                            {passenger.name}
+                            {passenger.seatsRequested > 1
+                              ? ` · ${passenger.seatsRequested} seats`
+                              : ""}
+                            {included ? "" : " · next car"}
+                          </span>
+                          <span className="font-semibold">{formatPaisa(passenger.farePaisa)}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
                   <button
                     type="button"
                     disabled={busy}
-                    onClick={() => void acceptRequest(req.id)}
+                    onClick={() => void acceptStack(stack)}
                     className="mt-3 w-full rounded bg-gray-900 py-2 text-white disabled:opacity-50"
                   >
-                    {acceptingId === req.id
+                    {acceptingKey === stack.key
                       ? "Accepting…"
                       : rides.length > 0
                         ? "Finish your current ride first"
-                        : "Accept"}
+                        : stack.acceptCount > 1
+                          ? `Accept pool · ${formatPaisa(stack.totalFarePaisa)}`
+                          : `Accept · ${formatPaisa(stack.totalFarePaisa)}`}
                   </button>
                 </li>
               );
