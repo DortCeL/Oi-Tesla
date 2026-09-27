@@ -134,4 +134,35 @@ describe("PRD pooling edge cases", () => {
     );
     expect(acceptSolo.status).toBe(400);
   });
+
+  it("does not pool Mirpur onto the Banani to Bashundhara road", async () => {
+    const banani = await getZoneId("Banani");
+    const bashundhara = await getZoneId("Bashundhara");
+    const mirpur = await getZoneId("Mirpur");
+
+    const driverToken = await login("jashim@oitesla.test");
+    const nusratToken = await login("nusrat@oitesla.test");
+    const rafiqToken = await login("rafiq@oitesla.test");
+
+    const firstRes = await createAndAcceptRideRequest(nusratToken, driverToken, {
+      pickupZoneId: banani,
+      destinationZoneId: bashundhara,
+      type: "SHARED",
+      seatsRequested: 1,
+      paymentMethod: "CASH",
+    });
+    expect(firstRes.status).toBe(201);
+    trackRideId(firstRes.body.request.rideId);
+
+    const branchRes = await createRideRequest(rafiqToken, {
+      pickupZoneId: banani,
+      destinationZoneId: mirpur,
+      type: "SHARED",
+      seatsRequested: 1,
+      paymentMethod: "CASH",
+    });
+    expect(branchRes.status).toBe(201);
+    expect(branchRes.body.request.status).toBe("REQUESTED");
+    expect(branchRes.body.request.rideId).toBeNull();
+  });
 });

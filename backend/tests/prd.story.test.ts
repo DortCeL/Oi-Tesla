@@ -12,7 +12,7 @@ import {
   setDriverOnline,
 } from "./helpers.js";
 
-/** PRD §1: Nusrat Banani→Mohakhali, then Rafiq Banani→Gulshan 1 share Bullet. */
+/** Nusrat Banani→Bashundhara, then Rafiq Banani→Gulshan 1 share Bullet. */
 describe("PRD rush-hour story", () => {
   const trackedRideIds = new Set<string>();
 
@@ -29,7 +29,7 @@ describe("PRD rush-hour story", () => {
 
   it("pools Nusrat and Rafiq on one ride with PRD corridor fares", async () => {
     const banani = await getZoneId("Banani");
-    const mohakhali = await getZoneId("Mohakhali");
+    const bashundhara = await getZoneId("Bashundhara");
     const gulshan = await getZoneId("Gulshan 1");
 
     const driverToken = await login("jashim@oitesla.test");
@@ -38,14 +38,14 @@ describe("PRD rush-hour story", () => {
 
     const nusratRes = await createAndAcceptRideRequest(nusratToken, driverToken, {
       pickupZoneId: banani,
-      destinationZoneId: mohakhali,
+      destinationZoneId: bashundhara,
       type: "SHARED",
       seatsRequested: 1,
       paymentMethod: "CASH",
     });
 
     expect(nusratRes.status).toBe(201);
-    expect(nusratRes.body.request.farePaisa).toBe(2400);
+    expect(nusratRes.body.request.farePaisa).toBe(5100);
     expect(nusratRes.body.request.status).toBe("MATCHED");
 
     const poolRideId = nusratRes.body.request.rideId as string;
@@ -77,9 +77,9 @@ describe("PRD rush-hour story", () => {
     const driverRide = ridesRes.body.rides.find(
       (ride: { id: string }) => ride.id === poolRideId,
     );
-    expect(driverRide.totalFarePaisa).toBe(6000);
+    expect(driverRide.totalFarePaisa).toBe(8700);
     expect(driverRide.passengers).toEqual([
-      { name: "Nusrat", farePaisa: 2400 },
+      { name: "Nusrat", farePaisa: 5100 },
       { name: "Rafiq", farePaisa: 3600 },
     ]);
   });
