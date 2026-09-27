@@ -4,9 +4,10 @@ import type { Route } from "./+types/passenger";
 import { apiUrl } from "../lib/api";
 import { clearAuth, getAuth } from "../lib/auth.client";
 import { authFetch, authJson } from "../lib/fetch.client";
-import { formatPaisa, formatRideType } from "../lib/format";
+import { formatGender, formatPaisa, formatRideType } from "../lib/format";
 import type {
   FareEstimate,
+  PoolMate,
   RideRequest,
   RideSummary,
   RideType,
@@ -79,6 +80,7 @@ export default function PassengerHome() {
   const [submitting, setSubmitting] = useState(false);
   const [booked, setBooked] = useState<RideRequest | null>(active);
   const [live, setLive] = useState<RideLive | null>(null);
+  const [poolMates, setPoolMates] = useState<PoolMate[]>([]);
 
   const tripReady =
     Boolean(pickupZoneId) &&
@@ -113,6 +115,38 @@ export default function PassengerHome() {
       window.clearInterval(id);
     };
   }, [booked?.id, booked?.status, navigate]);
+
+  const rideOpen =
+    live?.ride?.status === "WAITING" ||
+    live?.ride?.status === "MATCHED" ||
+    live?.ride?.status === "IN_PROGRESS";
+
+  useEffect(() => {
+    if (!booked || !rideOpen) {
+      setPoolMates([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadMates() {
+      try {
+        const result = await authJson<{ poolMates: PoolMate[] }>(
+          `/ride-requests/${booked!.id}/pool-mates`,
+        );
+        if (!cancelled) setPoolMates(result.poolMates);
+      } catch {
+        if (!cancelled) setPoolMates([]);
+      }
+    }
+
+    void loadMates();
+    const id = window.setInterval(() => void loadMates(), 3000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [booked?.id, rideOpen]);
 
   useEffect(() => {
     if (destinationZoneId && destinationZoneId === pickupZoneId) {
@@ -193,6 +227,7 @@ export default function PassengerHome() {
       const { request } = (await res.json()) as { request: RideRequest };
       setBooked(request);
       setLive(null);
+      setPoolMates([]);
     } catch (err) {
       if (err instanceof Response && err.status === 401) {
         void navigate("/login");
@@ -217,6 +252,7 @@ export default function PassengerHome() {
       }
       setBooked(null);
       setLive(null);
+      setPoolMates([]);
     } catch (err) {
       if (err instanceof Response && err.status === 401) {
         void navigate("/login");
@@ -231,6 +267,9 @@ export default function PassengerHome() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Hi, {name}</h1>
         <div className="flex items-center gap-3">
+          <Link to="/passenger/profile" className="text-sm text-blue-600">
+            Profile
+          </Link>
           <Link to="/map" className="text-sm text-blue-600">
             Route map
           </Link>
@@ -254,6 +293,31 @@ export default function PassengerHome() {
           {live?.driver ? (
             <p className="text-sm text-gray-600">Driver: {live.driver.name}</p>
           ) : null}
+          {poolMates.length > 0 ? (
+            <div className="space-y-2 border-t pt-3">
+              <p className="text-sm font-semibold">Your pool mates</p>
+              <ul className="space-y-3">
+                {poolMates.map((mate, index) => (
+                  <li key={`${mate.name}-${index}`} className="text-sm">
+                    <p className="font-medium">{mate.name}</p>
+                    <p className="text-gray-600">
+                      {formatGender(mate.gender)}
+                      {mate.occupation ? ` · ${mate.occupation}` : ""}
+                    </p>
+                    <p className="text-gray-800">Going to {mate.destinationZone.name}</p>
+                    <p className="text-gray-600">
+                      {formatRideType(mate.type)} · their fare {formatPaisa(mate.farePaisa)} ·{" "}
+                      {mate.paymentMethod === "TESLAPAY" ? "TeslaPay" : "Cash"}
+                    </p>
+                    {mate.affiliation ? <p className="text-gray-600">{mate.affiliation}</p> : null}
+                    {mate.hobbies.length > 0 ? (
+                      <p className="text-gray-600">Hobbies: {mate.hobbies.join(", ")}</p>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           {canCancel(booked, live) ? (
             <button
               type="button"
@@ -269,6 +333,7 @@ export default function PassengerHome() {
               onClick={() => {
                 setBooked(null);
                 setLive(null);
+                setPoolMates([]);
               }}
               className="w-full rounded border py-2"
             >
