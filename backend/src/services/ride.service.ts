@@ -7,6 +7,7 @@ import {
   sumPassengerFares,
   toDriverPassengerResponse,
 } from "../utils/ridePassengerMapper.js";
+import { maybeApplyQueuedOffline } from "./driverOffline.service.js";
 import { recordRideEvent } from "./rideEvent.service.js";
 
 const rideInclude = {
@@ -18,10 +19,32 @@ const activePassengerStatuses: RequestStatus[] = [
   RequestStatus.IN_PROGRESS,
 ];
 
+const historyPassengerStatuses: RequestStatus[] = [
+  RequestStatus.MATCHED,
+  RequestStatus.IN_PROGRESS,
+  RequestStatus.COMPLETED,
+  RequestStatus.CANCELLED,
+];
+
 const rideWithPassengersInclude = {
   pickupZone: { select: { id: true, name: true } },
   requests: {
     where: { status: { in: activePassengerStatuses } },
+    include: {
+      passenger: {
+        include: {
+          user: { select: { name: true } },
+        },
+      },
+    },
+    orderBy: { createdAt: "asc" as const },
+  },
+} satisfies Prisma.RideInclude;
+
+const rideWithHistoryPassengersInclude = {
+  pickupZone: { select: { id: true, name: true } },
+  requests: {
+    where: { status: { in: historyPassengerStatuses } },
     include: {
       passenger: {
         include: {
@@ -64,6 +87,24 @@ export async function listDriverRides(driverId: string) {
   });
 
   return rides.map(toDriverRideResponse);
+}
+
+export async function listDriverRideHistory(driverId: string) {
+  const rides = await prisma.ride.findMany({
+    where: {
+      driverId,
+      status: { in: [RideStatus.COMPLETED, RideStatus.CANCELLED] },
+    },
+    include: rideWithHistoryPassengersInclude,
+    orderBy: { createdAt: "desc" },
+    take: 40,
+  });
+
+  return rides.map((ride) => ({
+    ...toRideResponse(ride),
+    totalFarePaisa: sumPassengerFares(ride.requests),
+    passengers: ride.requests.map(toDriverPassengerResponse),
+  }));
 }
 
 export async function getDriverRideDetail(driverId: string, rideId: string) {
@@ -212,7 +253,7 @@ export async function completeRide(driverId: string, rideId: string) {
       actorUserId: driverId,
     });
 
-    return tx.ride.update({
+    const updatedRide = await tx.ride.update({
       where: { id: rideId },
       data: {
         status: RideStatus.COMPLETED,
@@ -220,6 +261,9 @@ export async function completeRide(driverId: string, rideId: string) {
       },
       include: rideWithPassengersInclude,
     });
+
+    await maybeApplyQueuedOffline(tx, driverId);
+    return updatedRide;
   });
 
   return toDriverRideResponse(updated);

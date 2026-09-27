@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import request from "supertest";
 import { prisma } from "../src/db/prisma.js";
 import {
+  app,
   cleanupAllDemoRides,
   cleanupRides,
   createAndAcceptRideRequest,
@@ -88,6 +90,23 @@ describe("PRD driver lifecycle", () => {
     for (const req of requests) {
       expect(req.status).toBe("COMPLETED");
     }
+
+    const history = await request(app)
+      .get("/api/driver/rides/history")
+      .set("Authorization", `Bearer ${driverToken}`);
+    expect(history.status).toBe(200);
+    expect(history.body.rides).toEqual([
+      expect.objectContaining({
+        id: rideId,
+        status: "COMPLETED",
+        totalFarePaisa: 7200,
+        passengers: [
+          { name: "Nusrat", farePaisa: 2400 },
+          { name: "Rafiq", farePaisa: 2400 },
+          { name: "Shirin", farePaisa: 2400 },
+        ],
+      }),
+    ]);
   });
 
   it("rejects start before driver marks arrival", async () => {

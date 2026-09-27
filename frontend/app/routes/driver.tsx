@@ -29,6 +29,7 @@ type RequestStack = {
 type DriverProfile = {
   driver: {
     isOnline: boolean;
+    offlineQueued: boolean;
     activeZoneIds: number[];
     teslas: { name: string; capacity: number; isActive: boolean }[];
   } | null;
@@ -66,6 +67,7 @@ export async function clientLoader() {
     name: auth.name,
     zones: zonesData.zones,
     isOnline: profile.driver?.isOnline ?? false,
+    offlineQueued: profile.driver?.offlineQueued ?? false,
     activeZoneIds: profile.driver?.activeZoneIds ?? [],
     tesla: profile.driver?.teslas.find((t) => t.isActive) ?? null,
     rides,
@@ -78,6 +80,7 @@ export default function DriverHome() {
 
   const [selectedZones, setSelectedZones] = useState<number[]>(loaderData.activeZoneIds);
   const [isOnline, setIsOnline] = useState(loaderData.isOnline);
+  const [offlineQueued, setOfflineQueued] = useState(loaderData.offlineQueued);
   const [rides, setRides] = useState(loaderData.rides);
   const [stacks, setStacks] = useState<RequestStack[]>([]);
   const [saving, setSaving] = useState(false);
@@ -90,13 +93,16 @@ export default function DriverHome() {
 
     async function poll() {
       try {
-        const [list, open] = await Promise.all([
+        const [list, open, me] = await Promise.all([
           authJson<{ rides: DriverRide[] }>("/driver/rides"),
           authJson<{ stacks: RequestStack[] }>("/driver/requests"),
+          authJson<{ user: DriverProfile }>("/auth/driver/me"),
         ]);
         if (!cancelled) {
           setRides(list.rides.filter(isActiveRide));
           setStacks(open.stacks);
+          setIsOnline(me.user.driver?.isOnline ?? false);
+          setOfflineQueued(me.user.driver?.offlineQueued ?? false);
         }
       } catch {
         // ignore a missed poll
@@ -141,9 +147,31 @@ export default function DriverHome() {
       }
       const body = (await res.json()) as { user: DriverProfile };
       setIsOnline(body.user.driver?.isOnline ?? nextOnline);
-      if (body.user.driver?.isOnline) {
-        setSelectedZones(body.user.driver.activeZoneIds);
+      setOfflineQueued(body.user.driver?.offlineQueued ?? false);
+      setSelectedZones(body.user.driver?.activeZoneIds ?? []);
+    } catch (err) {
+      if (err instanceof Response && err.status === 401) {
+        void navigate("/login");
+        return;
       }
+      setError(err instanceof Error ? err.message : "Update failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function stayOnline() {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await authFetch("/driver/status/stay-online", { method: "POST" });
+      if (!res.ok) {
+        const err = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(err?.error ?? "Could not stay online");
+      }
+      const body = (await res.json()) as { user: DriverProfile };
+      setIsOnline(body.user.driver?.isOnline ?? true);
+      setOfflineQueued(body.user.driver?.offlineQueued ?? false);
     } catch (err) {
       if (err instanceof Response && err.status === 401) {
         void navigate("/login");
@@ -221,6 +249,12 @@ export default function DriverHome() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Hi, {loaderData.name}</h1>
         <div className="flex items-center gap-3">
+          <Link to="/driver/history" className="text-sm text-blue-600">
+            History
+          </Link>
+          <Link to="/driver/profile" className="text-sm text-blue-600">
+            Profile
+          </Link>
           <Link to="/map" className="text-sm text-blue-600">
             Route map
           </Link>
@@ -258,10 +292,16 @@ export default function DriverHome() {
           <button
             type="button"
             disabled={saving}
-            onClick={() => void saveStatus(false)}
+            onClick={() => void (offlineQueued ? stayOnline() : saveStatus(false))}
             className="w-full rounded border py-2"
           >
-            {saving ? "Updating…" : "Go offline"}
+            {saving
+              ? "Updating…"
+              : offlineQueued
+                ? "Stay online"
+                : rides.length > 0
+                  ? "Go offline after this ride"
+                  : "Go offline"}
           </button>
         ) : (
           <button
@@ -273,6 +313,11 @@ export default function DriverHome() {
             {saving ? "Updating…" : "Go online"}
           </button>
         )}
+        {offlineQueued ? (
+          <p className="text-sm text-gray-700">
+            Going offline after this ride. Finish the trip, and you will not take a new one.
+          </p>
+        ) : null}
       </section>
 
       {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
@@ -288,7 +333,7 @@ export default function DriverHome() {
         ) : (
           <ul className="mt-3 space-y-3">
             {stacks.map((stack) => {
-              const busy = acceptingKey === stack.key || rides.length > 0;
+              const busy = acceptingKey === stack.key || rides.length > 0 || offlineQueued;
               const overflow = stack.waitingCount - stack.acceptCount;
               return (
                 <li key={stack.key} className="rounded border p-4 text-sm">
@@ -330,9 +375,11 @@ export default function DriverHome() {
                   >
                     {acceptingKey === stack.key
                       ? "Accepting…"
-                      : rides.length > 0
-                        ? "Finish your current ride first"
-                        : stack.acceptCount > 1
+                      : offlineQueued
+                        ? "Going offline after this ride"
+                        : rides.length > 0
+                          ? "Finish your current ride first"
+                          : stack.acceptCount > 1
                           ? `Accept pool · ${formatPaisa(stack.totalFarePaisa)}`
                           : `Accept · ${formatPaisa(stack.totalFarePaisa)}`}
                   </button>

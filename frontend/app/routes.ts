@@ -11,5 +11,7 @@ export default [
   route("passenger/ride/:requestId", "routes/passenger.ride.$requestId.tsx"),
   route("passenger/history", "routes/passenger.history.tsx"),
   route("driver", "routes/driver.tsx"),
+  route("driver/profile", "routes/driver.profile.tsx"),
+  route("driver/history", "routes/driver.history.tsx"),
   route("map", "routes/map.tsx"),
 ] satisfies RouteConfig;

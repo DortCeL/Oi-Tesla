@@ -483,6 +483,9 @@ export async function acceptRequestStack(driverId: string, input: AcceptStackInp
     if (!driver.isOnline) {
       throw new AppError(400, "Go online before accepting requests");
     }
+    if (driver.offlineQueued) {
+      throw new AppError(400, "Cannot start a new ride while going offline");
+    }
     if (!driver.activeZoneIds.includes(input.pickupZoneId)) {
       throw new AppError(400, "Pickup zone is outside your active zones");
     }
@@ -638,6 +641,10 @@ async function createRideOnDriver(
 
   if (!driver.isOnline) {
     throw new AppError(400, "Go online before accepting requests");
+  }
+
+  if (driver.offlineQueued) {
+    throw new AppError(400, "Cannot start a new ride while going offline");
   }
 
   if (!driver.activeZoneIds.includes(request.pickupZoneId)) {

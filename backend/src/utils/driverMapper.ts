@@ -10,6 +10,7 @@ type DriverUser = {
   createdAt: Date;
   driver: {
     isOnline: boolean;
+    offlineQueued: boolean;
     activeZoneIds: number[];
     teslas: Pick<Tesla, "id" | "name" | "capacity" | "isActive">[];
   } | null;
@@ -27,6 +28,7 @@ export function toDriverResponse(user: DriverUser) {
     driver: user.driver
       ? {
           isOnline: user.driver.isOnline,
+          offlineQueued: user.driver.offlineQueued,
           activeZoneIds: user.driver.activeZoneIds,
           teslas: user.driver.teslas,
         }

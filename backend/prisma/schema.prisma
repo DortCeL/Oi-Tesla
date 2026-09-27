@@ -65,6 +65,7 @@ model Driver {
   userId         String  @id @map("user_id")
   user           User    @relation(fields: [userId], references: [id])
   isOnline       Boolean @default(false) @map("is_online")
+  offlineQueued  Boolean @default(false) @map("offline_queued")
   activeZoneIds  Int[]   @default([]) @map("active_zone_ids")
 
   teslas Tesla[]

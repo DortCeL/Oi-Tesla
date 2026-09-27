@@ -2,6 +2,7 @@ import { Prisma, RequestStatus, RideStatus } from "@prisma/client";
 import { prisma } from "../db/prisma.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { calculateFare } from "../utils/fare.js";
+import { maybeApplyQueuedOffline } from "./driverOffline.service.js";
 import { recordRideEvent } from "./rideEvent.service.js";
 import { tryMatchRideRequest } from "./pooling.service.js";
 import { toRideRequestResponse } from "../utils/rideRequestMapper.js";
@@ -315,6 +316,15 @@ export async function cancelRideRequest(passengerId: string, requestId: string) 
 
     const previousStatus = request.status;
     const rideIdForEvent = request.rideId;
+    let driverIdForOffline: string | null = null;
+
+    if (rideIdForEvent) {
+      const rideRow = await tx.ride.findUnique({
+        where: { id: rideIdForEvent },
+        select: { driverId: true },
+      });
+      driverIdForOffline = rideRow?.driverId ?? null;
+    }
 
     const cancelled = await tx.rideRequest.update({
       where: { id: requestId },
@@ -334,6 +344,10 @@ export async function cancelRideRequest(passengerId: string, requestId: string) 
         toStatus: RequestStatus.CANCELLED,
         actorUserId: passengerId,
       });
+    }
+
+    if (driverIdForOffline) {
+      await maybeApplyQueuedOffline(tx, driverIdForOffline);
     }
 
     return toRideRequestResponse(cancelled);
