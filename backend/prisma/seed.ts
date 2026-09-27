@@ -6,95 +6,69 @@ const prisma = new PrismaClient();
 
 const DEMO_PASSWORD = "password123";
 
-// Approximate lat/lng for Dhaka areas (hand-picked, not from a maps API)
+/**
+ * T-junction. Fares use these path lengths, not the lat/lng values.
+ *
+ *   Banani —— Mohakhali —— Gulshan 1 —— Bashundhara
+ *                 |
+ *              Farmgate
+ *                 |
+ *               Mirpur
+ *
+ * Edges: Banani–Mohakhali 2km, Mohakhali–Gulshan 1 2km,
+ * Gulshan 1–Bashundhara 2.5km, Mohakhali–Farmgate 3km, Farmgate–Mirpur 3.5km.
+ */
 const ZONES = [
   { name: "Banani", lat: "23.793600", lng: "90.404400" },
-  { name: "Gulshan 1", lat: "23.780800", lng: "90.415600" },
   { name: "Mohakhali", lat: "23.777800", lng: "90.403300" },
-  { name: "Dhanmondi", lat: "23.746100", lng: "90.374200" },
-  { name: "Mirpur", lat: "23.806700", lng: "90.368300" },
-  { name: "Uttara", lat: "23.875900", lng: "90.379500" },
-  { name: "Farmgate", lat: "23.758800", lng: "90.389000" },
+  { name: "Gulshan 1", lat: "23.780800", lng: "90.415600" },
   { name: "Bashundhara", lat: "23.815900", lng: "90.424700" },
+  { name: "Farmgate", lat: "23.758800", lng: "90.389000" },
+  { name: "Mirpur", lat: "23.806700", lng: "90.368300" },
 ] as const;
 
-// Distances in meters — round numbers, hand-testable for fare calc.
-//
-// PRD corridor (Banani pickup, rush-hour story):
-//   Banani ──2 km── Mohakhali (Nusrat) ──2 km── Gulshan 1 (Rafiq)
-// Nusrat books first → Mohakhali; Rafiq joins same pool → Gulshan 1.
 const DISTANCES: Record<string, Record<string, number>> = {
   Banani: {
+    Mohakhali: 2000,
     "Gulshan 1": 4000,
-    Mohakhali: 2000,
-    Dhanmondi: 4500,
-    Mirpur: 6000,
-    Uttara: 8500,
-    Farmgate: 3500,
-    Bashundhara: 3000,
-  },
-  "Gulshan 1": {
-    Banani: 4000,
-    Mohakhali: 2000,
-    Dhanmondi: 5000,
-    Mirpur: 6500,
-    Uttara: 7000,
-    Farmgate: 4000,
-    Bashundhara: 2500,
+    Bashundhara: 6500,
+    Farmgate: 5000,
+    Mirpur: 8500,
   },
   Mohakhali: {
     Banani: 2000,
     "Gulshan 1": 2000,
-    Dhanmondi: 3500,
-    Mirpur: 5500,
-    Uttara: 8000,
+    Bashundhara: 4500,
     Farmgate: 3000,
-    Bashundhara: 4000,
-  },
-  Dhanmondi: {
-    Banani: 4500,
-    "Gulshan 1": 5000,
-    Mohakhali: 3500,
-    Mirpur: 7000,
-    Uttara: 12000,
-    Farmgate: 2000,
-    Bashundhara: 6500,
-  },
-  Mirpur: {
-    Banani: 6000,
-    "Gulshan 1": 6500,
-    Mohakhali: 5500,
-    Dhanmondi: 7000,
-    Uttara: 5000,
-    Farmgate: 6500,
-    Bashundhara: 7500,
-  },
-  Uttara: {
-    Banani: 8500,
-    "Gulshan 1": 7000,
-    Mohakhali: 8000,
-    Dhanmondi: 12000,
-    Mirpur: 5000,
-    Farmgate: 11000,
-    Bashundhara: 6000,
-  },
-  Farmgate: {
-    Banani: 3500,
-    "Gulshan 1": 4000,
-    Mohakhali: 3000,
-    Dhanmondi: 2000,
     Mirpur: 6500,
-    Uttara: 11000,
-    Bashundhara: 5500,
+  },
+  "Gulshan 1": {
+    Banani: 4000,
+    Mohakhali: 2000,
+    Bashundhara: 2500,
+    Farmgate: 5000,
+    Mirpur: 8500,
   },
   Bashundhara: {
-    Banani: 3000,
+    Banani: 6500,
+    Mohakhali: 4500,
     "Gulshan 1": 2500,
-    Mohakhali: 4000,
-    Dhanmondi: 6500,
-    Mirpur: 7500,
-    Uttara: 6000,
-    Farmgate: 5500,
+    Farmgate: 7500,
+    Mirpur: 11000,
+  },
+  Farmgate: {
+    Banani: 5000,
+    Mohakhali: 3000,
+    "Gulshan 1": 5000,
+    Bashundhara: 7500,
+    Mirpur: 3500,
+  },
+  Mirpur: {
+    Banani: 8500,
+    Mohakhali: 6500,
+    "Gulshan 1": 8500,
+    Bashundhara: 11000,
+    Farmgate: 3500,
   },
 };
 
@@ -157,7 +131,7 @@ async function main() {
     },
   });
 
-  // Nusrat — Banani → Mohakhali in the story
+  // Nusrat — Banani → Bashundhara in the story
   await prisma.user.create({
     data: {
       name: "Nusrat",

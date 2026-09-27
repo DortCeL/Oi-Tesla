@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { redirect, useLoaderData, useNavigate } from "react-router";
+import { Link, redirect, useLoaderData, useNavigate } from "react-router";
 import type { Route } from "./+types/passenger";
 import { apiUrl } from "../lib/api";
 import { clearAuth, getAuth } from "../lib/auth.client";
@@ -230,9 +230,14 @@ export default function PassengerHome() {
     <main className="mx-auto max-w-lg p-6 pt-16">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Hi, {name}</h1>
-        <button type="button" onClick={logout} className="text-sm text-blue-600">
-          Logout
-        </button>
+        <div className="flex items-center gap-3">
+          <Link to="/map" className="text-sm text-blue-600">
+            Route map
+          </Link>
+          <button type="button" onClick={logout} className="text-sm text-blue-600">
+            Logout
+          </button>
+        </div>
       </div>
 
       {booked ? (
