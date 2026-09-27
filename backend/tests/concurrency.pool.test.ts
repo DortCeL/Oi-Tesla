@@ -3,6 +3,7 @@ import { prisma } from "../src/db/prisma.js";
 import {
   cleanupAllDemoRides,
   cleanupRides,
+  createAndAcceptRideRequest,
   createRideRequest,
   getZoneId,
   login,
@@ -31,12 +32,13 @@ describe("concurrent last-seat pool claim", () => {
     const banani = await getZoneId("Banani");
     const mohakhali = await getZoneId("Mohakhali");
 
+    const driverToken = await login("jashim@oitesla.test");
     const rafiqToken = await login("rafiq@oitesla.test");
     const nusratToken = await login("nusrat@oitesla.test");
     const shirinToken = await login("shirin@oitesla.test");
 
     // Fill Bullet to 2/3: one SHARED party of two (Rafiq + friend equivalent).
-    const setupRes = await createRideRequest(rafiqToken, {
+    const setupRes = await createAndAcceptRideRequest(rafiqToken, driverToken, {
       pickupZoneId: banani,
       destinationZoneId: mohakhali,
       type: "SHARED",
@@ -106,7 +108,7 @@ describe("concurrent last-seat pool claim", () => {
     expect(poolRideAfter.seatsTaken).toBe(3);
     expect(poolRideAfter.status).toBe("MATCHED");
 
-    // Loser must not be on the full pool ride (may have started a separate ride).
+    // Loser stays waiting. Accepting would start a second ride, which is not allowed.
     const loserRideId = nusratRideId === poolRideId ? shirinRideId : nusratRideId;
     expect(loserRideId).not.toBe(poolRideId);
 

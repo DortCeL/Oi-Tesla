@@ -263,10 +263,25 @@ export async function cancelRideRequest(passengerId: string, requestId: string) 
         throw new AppError(400, "Cannot cancel after ride is locked");
       }
 
-      await tx.ride.update({
+      const updatedRide = await tx.ride.update({
         where: { id: request.rideId },
         data: { seatsTaken: { decrement: request.seatsRequested } },
       });
+
+      if (updatedRide.seatsTaken <= 0) {
+        await tx.ride.update({
+          where: { id: request.rideId },
+          data: { status: RideStatus.CANCELLED },
+        });
+        await recordRideEvent(tx, {
+          rideId: request.rideId,
+          rideRequestId: request.id,
+          fromStatus: RideStatus.WAITING,
+          toStatus: RideStatus.CANCELLED,
+          actorUserId: passengerId,
+          note: "last_passenger_cancelled",
+        });
+      }
     }
 
     const previousStatus = request.status;

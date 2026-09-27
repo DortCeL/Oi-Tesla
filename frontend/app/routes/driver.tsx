@@ -4,8 +4,12 @@ import type { Route } from "./+types/driver";
 import { apiUrl } from "../lib/api";
 import { clearAuth, getAuth } from "../lib/auth.client";
 import { authFetch, authJson } from "../lib/fetch.client";
-import { formatRideType } from "../lib/format";
-import type { DriverRide, Zone } from "../lib/types";
+import { formatPaisa, formatRideType } from "../lib/format";
+import type { DriverRide, RideRequest, Zone } from "../lib/types";
+
+type IncomingRequest = RideRequest & {
+  passenger: { name: string };
+};
 
 type DriverProfile = {
   driver: {
@@ -60,8 +64,10 @@ export default function DriverHome() {
   const [selectedZones, setSelectedZones] = useState<number[]>(loaderData.activeZoneIds);
   const [isOnline, setIsOnline] = useState(loaderData.isOnline);
   const [rides, setRides] = useState(loaderData.rides);
+  const [incoming, setIncoming] = useState<IncomingRequest[]>([]);
   const [saving, setSaving] = useState(false);
   const [actingRideId, setActingRideId] = useState<string | null>(null);
+  const [acceptingId, setAcceptingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -69,8 +75,14 @@ export default function DriverHome() {
 
     async function poll() {
       try {
-        const list = await authJson<{ rides: DriverRide[] }>("/driver/rides");
-        if (!cancelled) setRides(list.rides.filter(isActiveRide));
+        const [list, open] = await Promise.all([
+          authJson<{ rides: DriverRide[] }>("/driver/rides"),
+          authJson<{ requests: IncomingRequest[] }>("/driver/requests"),
+        ]);
+        if (!cancelled) {
+          setRides(list.rides.filter(isActiveRide));
+          setIncoming(open.requests);
+        }
       } catch {
         // ignore a missed poll
       }
@@ -125,6 +137,31 @@ export default function DriverHome() {
       setError(err instanceof Error ? err.message : "Update failed");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function acceptRequest(requestId: string) {
+    setAcceptingId(requestId);
+    setError(null);
+    try {
+      const res = await authFetch(`/driver/requests/${requestId}/accept`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const err = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(err?.error ?? "Could not accept");
+      }
+      setIncoming((current) => current.filter((req) => req.id !== requestId));
+      const list = await authJson<{ rides: DriverRide[] }>("/driver/rides");
+      setRides(list.rides.filter(isActiveRide));
+    } catch (err) {
+      if (err instanceof Response && err.status === 401) {
+        void navigate("/login");
+        return;
+      }
+      setError(err instanceof Error ? err.message : "Could not accept");
+    } finally {
+      setAcceptingId(null);
     }
   }
 
@@ -213,10 +250,49 @@ export default function DriverHome() {
       {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
 
       <section className="mt-6">
+        <h2 className="font-semibold">Incoming requests</h2>
+        {!isOnline ? (
+          <p className="mt-2 text-sm text-gray-600">Go online to see pickup requests.</p>
+        ) : incoming.length === 0 ? (
+          <p className="mt-2 text-sm text-gray-600">No requests in your zones right now.</p>
+        ) : (
+          <ul className="mt-3 space-y-3">
+            {incoming.map((req) => {
+              const busy = acceptingId === req.id || rides.length > 0;
+              return (
+                <li key={req.id} className="rounded border p-4 text-sm">
+                  <p className="font-semibold">{req.passenger.name}</p>
+                  <p className="mt-1 text-gray-600">
+                    {req.pickupZone.name} → {req.destinationZone.name}
+                  </p>
+                  <p className="mt-1">
+                    {formatRideType(req.type)} · {req.seatsRequested} seat
+                    {req.seatsRequested === 1 ? "" : "s"} · {formatPaisa(req.farePaisa)}
+                  </p>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void acceptRequest(req.id)}
+                    className="mt-3 w-full rounded bg-gray-900 py-2 text-white disabled:opacity-50"
+                  >
+                    {acceptingId === req.id
+                      ? "Accepting…"
+                      : rides.length > 0
+                        ? "Finish your current ride first"
+                        : "Accept"}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      <section className="mt-6">
         <h2 className="font-semibold">Active rides</h2>
         {rides.length === 0 ? (
           <p className="mt-2 text-sm text-gray-600">
-            No ride yet. Go online, then a passenger booking in your zones can match you.
+            No ride yet. Accept a request above to start one.
           </p>
         ) : (
           <ul className="mt-3 space-y-3">

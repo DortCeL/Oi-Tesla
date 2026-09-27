@@ -3,6 +3,7 @@ import { prisma } from "../src/db/prisma.js";
 import {
   cleanupAllDemoRides,
   cleanupRides,
+  createAndAcceptRideRequest,
   createRideRequest,
   getZoneId,
   login,
@@ -29,10 +30,11 @@ describe("PRD rush-hour story", () => {
     const mohakhali = await getZoneId("Mohakhali");
     const gulshan = await getZoneId("Gulshan 1");
 
+    const driverToken = await login("jashim@oitesla.test");
     const nusratToken = await login("nusrat@oitesla.test");
     const rafiqToken = await login("rafiq@oitesla.test");
 
-    const nusratRes = await createRideRequest(nusratToken, {
+    const nusratRes = await createAndAcceptRideRequest(nusratToken, driverToken, {
       pickupZoneId: banani,
       destinationZoneId: mohakhali,
       type: "SHARED",

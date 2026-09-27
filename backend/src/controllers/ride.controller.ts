@@ -7,6 +7,18 @@ import {
   markDriverArrival,
   startRide,
 } from "../services/ride.service.js";
+import {
+  acceptRideRequest,
+  listOpenRideRequestsForDriver,
+} from "../services/pooling.service.js";
+
+function getRequestIdParam(req: Request): string {
+  const requestId = req.params.requestId;
+  if (typeof requestId !== "string") {
+    throw new AppError(400, "Invalid request id");
+  }
+  return requestId;
+}
 
 function getRideIdParam(req: Request): string {
   const rideId = req.params.rideId;
@@ -101,6 +113,42 @@ export async function completeRideHandler(
 
     const ride = await completeRide(req.user.id, getRideIdParam(req));
     res.json({ ride });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function listDriverRequestsHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    if (!req.user) {
+      next(new AppError(401, "Unauthorized"));
+      return;
+    }
+
+    const requests = await listOpenRideRequestsForDriver(req.user.id);
+    res.json({ requests });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function acceptRideRequestHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    if (!req.user) {
+      next(new AppError(401, "Unauthorized"));
+      return;
+    }
+
+    const request = await acceptRideRequest(req.user.id, getRequestIdParam(req));
+    res.json({ request });
   } catch (err) {
     next(err);
   }
