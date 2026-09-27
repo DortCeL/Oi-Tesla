@@ -1,7 +1,10 @@
 import { Router } from "express";
 import { Role } from "@prisma/client";
 import { requireAuth } from "../middleware/auth.js";
-import { setDriverStatusHandler } from "../controllers/driver.controller.js";
+import {
+  clearDriverOfflineQueueHandler,
+  setDriverStatusHandler,
+} from "../controllers/driver.controller.js";
 import {
   acceptRequestStackHandler,
   acceptRideRequestHandler,
@@ -20,6 +23,11 @@ driverRouter.patch(
   "/status",
   requireAuth([Role.DRIVER]),
   setDriverStatusHandler,
+);
+driverRouter.post(
+  "/status/stay-online",
+  requireAuth([Role.DRIVER]),
+  clearDriverOfflineQueueHandler,
 );
 driverRouter.get(
   "/requests",

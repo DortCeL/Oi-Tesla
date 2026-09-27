@@ -7,6 +7,7 @@ import {
   sumPassengerFares,
   toDriverPassengerResponse,
 } from "../utils/ridePassengerMapper.js";
+import { maybeApplyQueuedOffline } from "./driverOffline.service.js";
 import { recordRideEvent } from "./rideEvent.service.js";
 
 const rideInclude = {
@@ -252,7 +253,7 @@ export async function completeRide(driverId: string, rideId: string) {
       actorUserId: driverId,
     });
 
-    return tx.ride.update({
+    const updatedRide = await tx.ride.update({
       where: { id: rideId },
       data: {
         status: RideStatus.COMPLETED,
@@ -260,6 +261,9 @@ export async function completeRide(driverId: string, rideId: string) {
       },
       include: rideWithPassengersInclude,
     });
+
+    await maybeApplyQueuedOffline(tx, driverId);
+    return updatedRide;
   });
 
   return toDriverRideResponse(updated);
