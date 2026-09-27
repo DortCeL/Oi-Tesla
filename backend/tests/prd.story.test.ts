@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import request from "supertest";
 import { prisma } from "../src/db/prisma.js";
 import {
+  app,
   cleanupAllDemoRides,
   cleanupRides,
   createAndAcceptRideRequest,
@@ -67,6 +69,19 @@ describe("PRD rush-hour story", () => {
     expect(poolRide.seatsTaken).toBe(2);
     expect(poolRide.capacity).toBe(3);
     expect(poolRide.status).toBe("WAITING");
+
+    const ridesRes = await request(app)
+      .get("/api/driver/rides")
+      .set("Authorization", `Bearer ${driverToken}`);
+    expect(ridesRes.status).toBe(200);
+    const driverRide = ridesRes.body.rides.find(
+      (ride: { id: string }) => ride.id === poolRideId,
+    );
+    expect(driverRide.totalFarePaisa).toBe(6000);
+    expect(driverRide.passengers).toEqual([
+      { name: "Nusrat", farePaisa: 2400 },
+      { name: "Rafiq", farePaisa: 3600 },
+    ]);
   });
 
   it("doubles a shared fare for two seats and keeps a reserved ride at one price", async () => {

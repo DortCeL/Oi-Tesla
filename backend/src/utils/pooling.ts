@@ -9,13 +9,35 @@ export function hasEnoughSeats(  capacity: number,
 }
 
 /**
- * True when newDest fits the ride without a detour.
+ * True when A and B lie on the same road from pickup.
+ * Either stop can be on the way to the other, so booking order does not matter.
+ */
+export function areOnSameCorridor(
+  dist: DistanceLookup,
+  pickupZoneId: number,
+  destinationA: number,
+  destinationB: number,
+): boolean {
+  if (destinationA === destinationB) {
+    return true;
+  }
+
+  const pickupToA = dist(pickupZoneId, destinationA);
+  const pickupToB = dist(pickupZoneId, destinationB);
+  const aToB = dist(destinationA, destinationB);
+
+  if (pickupToA === null || pickupToB === null || aToB === null) {
+    return false;
+  }
+
+  return pickupToA + aToB <= pickupToB || pickupToB + aToB <= pickupToA;
+}
+
+/**
+ * True when the new stop shares a corridor with every destination already on the ride.
  *
- * For each passenger already on the ride, the new stop must lie on the same
- * corridor: dist(pickup, existing) + dist(existing, new) <= dist(pickup, new).
- *
- * Example (PRD): Nusrat Banani→Mohakhali first, then Rafiq Banani→Gulshan 1
- * can join — Mohakhali lies on the Banani→Gulshan corridor. Reverse order fails.
+ * Example: Gulshan 1 is accepted first, then Mohakhali still joins, because
+ * Mohakhali sits on the Banani → Gulshan 1 road.
  */
 export function isDestinationCompatible(
   dist: DistanceLookup,
@@ -27,21 +49,15 @@ export function isDestinationCompatible(
     return true;
   }
 
-  const pickupToNew = dist(pickupZoneId, newDestinationZoneId);
-  if (pickupToNew === null) {
-    return false;
-  }
-
   for (const existingDestinationZoneId of existingDestinationZoneIds) {
-    const pickupToExisting = dist(pickupZoneId, existingDestinationZoneId);
-    const existingToNew = dist(existingDestinationZoneId, newDestinationZoneId);
-
-    if (pickupToExisting === null || existingToNew === null) {
-      return false;
-    }
-
-    // Detour would make the via-route longer than going direct to new.
-    if (pickupToExisting + existingToNew > pickupToNew) {
+    if (
+      !areOnSameCorridor(
+        dist,
+        pickupZoneId,
+        newDestinationZoneId,
+        existingDestinationZoneId,
+      )
+    ) {
       return false;
     }
   }
