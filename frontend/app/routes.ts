@@ -7,4 +7,5 @@ export default [
   route("signup/driver", "routes/signup.driver.tsx"),
   route("passenger", "routes/passenger.tsx"),
   route("driver", "routes/driver.tsx"),
+  route("map", "routes/map.tsx"),
 ] satisfies RouteConfig;

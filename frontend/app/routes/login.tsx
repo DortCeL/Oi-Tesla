@@ -109,6 +109,11 @@ export default function Login() {
         </Link>{" "}
         signup
       </p>
+      <p className="mt-4 text-sm">
+        <Link to="/map" className="text-blue-600">
+          Route map
+        </Link>
+      </p>
       <p className="mt-2 text-sm text-gray-400">
         Demo: nusrat@oitesla.test or jashim@oitesla.test — password123
       </p>

@@ -43,6 +43,9 @@ export default function Home() {
         >
           Driver signup
         </Link>
+        <Link to="/map" className="inline-block rounded border px-4 py-2 text-center">
+          Route map
+        </Link>
       </div>
     </main>
   );
