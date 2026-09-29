@@ -1,4 +1,4 @@
-import { PaymentMethod, RideType } from "@prisma/client";
+import { PaymentMethod, PoolGenderPreference, RideType } from "@prisma/client";
 import { z } from "zod";
 
 const rideRequestTripFields = z.object({
@@ -19,6 +19,7 @@ export const rideRequestEstimateSchema = rideRequestTripFields.refine(
 export const rideRequestCreateSchema = rideRequestTripFields
   .extend({
     paymentMethod: z.nativeEnum(PaymentMethod),
+    poolGender: z.nativeEnum(PoolGenderPreference).optional(),
   })
   .refine((data) => data.pickupZoneId !== data.destinationZoneId, {
     message: "Pickup and destination must be different zones",

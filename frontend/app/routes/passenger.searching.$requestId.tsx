@@ -4,7 +4,7 @@ import type { Route } from "./+types/passenger.searching.$requestId";
 import { passengerNav } from "../components/TopNav";
 import { getAuth } from "../lib/auth.client";
 import { authFetch, authJson } from "../lib/fetch.client";
-import { formatPaisa, formatRideType } from "../lib/format";
+import { formatPaisa, formatPoolGender, formatRideType } from "../lib/format";
 import type { RideRequest, RideSummary } from "../lib/types";
 
 type PollResult = {
@@ -105,48 +105,64 @@ export default function PassengerSearching() {
     }
   }
 
+  const req = data?.request;
+
   return (
     <main className="page">
       {passengerNav(name)}
 
-      <section className="card text-center">
-        <div className="mb-6 flex justify-center gap-2">
-          {[0, 1, 2].map((dot) => (
-            <span
-              key={dot}
-              className="search-dot inline-block h-3 w-3 rounded-full bg-emerald-600"
-              style={{ animationDelay: `${dot * 0.2}s` }}
-            />
-          ))}
-        </div>
-        <h2 className="text-xl font-bold">Waiting for a driver</h2>
-        <p className="mt-2 text-sm text-gray-600">
-          Nearby drivers can see your request and accept it.
-        </p>
-
-        {data ? (
-          <div className="mt-6 rounded border bg-gray-50 p-4 text-left text-sm">
-            <p>
-              {data.request.pickupZone.name} → {data.request.destinationZone.name}
-            </p>
-            <p className="mt-1 text-gray-600">
-              {formatRideType(data.request.type)} · {data.request.seatsRequested} seat
-              {data.request.seatsRequested === 1 ? "" : "s"} · {formatPaisa(data.request.farePaisa)}
-            </p>
+      <div className="space-y-5">
+        <div className="live-banner live-banner-enroute">
+          <div className="live-banner-orbit" aria-hidden>
+            <span className="live-banner-orbit-dot" />
           </div>
-        ) : null}
+          <p className="live-banner-kicker">Searching</p>
+          <p className="live-banner-title">Looking for a driver</p>
+          <p className="live-banner-sub">
+            Drivers in your pickup zone can see this request and accept it.
+          </p>
+        </div>
 
-        {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
+        {req ? (
+          <section className="card text-left">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Your request
+            </p>
+            <p className="mt-2 text-2xl font-bold tracking-tight text-gray-900">
+              {req.pickupZone.name} → {req.destinationZone.name}
+            </p>
+            <p className="mt-1 text-sm text-gray-500">
+              {formatRideType(req.type)} · {req.seatsRequested} seat
+              {req.seatsRequested === 1 ? "" : "s"}
+              {req.type === "SHARED" ? ` · ${formatPoolGender(req.poolGender)}` : ""}
+            </p>
+            <div className="mt-4 rounded-xl bg-emerald-50 p-4 ring-1 ring-emerald-100">
+              <p className="text-xs font-bold uppercase tracking-wide text-emerald-800">
+                Your fare
+              </p>
+              <p className="mt-1 text-3xl font-bold text-emerald-950">
+                {formatPaisa(req.farePaisa)}
+              </p>
+              <p className="mt-1 text-sm text-emerald-900/80">
+                Pay by {req.paymentMethod === "TESLAPAY" ? "TeslaPay" : "cash"}
+              </p>
+            </div>
+          </section>
+        ) : (
+          <section className="card text-sm text-gray-500">Loading your request…</section>
+        )}
+
+        {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
         <button
           type="button"
           onClick={() => void cancelRequest()}
           disabled={cancelling}
-          className="mt-6 text-sm text-red-600 disabled:opacity-50"
+          className="btn-secondary w-full text-red-600"
         >
           {cancelling ? "Cancelling…" : "Cancel request"}
         </button>
-      </section>
+      </div>
     </main>
   );
 }

@@ -32,12 +32,8 @@ export async function registerPassenger(input: PassengerRegisterInput) {
       passwordHash,
       role: Role.PASSENGER,
       gender: input.gender,
-      hobbies: input.hobbies ?? [],
       passenger: {
-        create: {
-          occupation: input.occupation,
-          affiliation: input.affiliation,
-        },
+        create: {},
       },
     },
     include: passengerInclude,

@@ -31,6 +31,7 @@ const rideWithPassengersInclude = {
   requests: {
     where: { status: { in: activePassengerStatuses } },
     include: {
+      destinationZone: { select: { id: true, name: true } },
       passenger: {
         include: {
           user: { select: { name: true } },
@@ -46,6 +47,7 @@ const rideWithHistoryPassengersInclude = {
   requests: {
     where: { status: { in: historyPassengerStatuses } },
     include: {
+      destinationZone: { select: { id: true, name: true } },
       passenger: {
         include: {
           user: { select: { name: true } },

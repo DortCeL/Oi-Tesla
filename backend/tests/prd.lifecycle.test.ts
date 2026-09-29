@@ -75,6 +75,7 @@ describe("PRD driver lifecycle", () => {
     expect(arriveRes.body.ride.passengers[0]).toEqual({
       name: expect.any(String),
       farePaisa: 2400,
+      destinationZone: { id: expect.any(Number), name: "Mohakhali" },
     });
     expect((await driverStart(driverToken, rideId)).status).toBe(200);
     expect((await driverComplete(driverToken, rideId)).status).toBe(200);
@@ -101,9 +102,21 @@ describe("PRD driver lifecycle", () => {
         status: "COMPLETED",
         totalFarePaisa: 7200,
         passengers: [
-          { name: "Nusrat", farePaisa: 2400 },
-          { name: "Rafiq", farePaisa: 2400 },
-          { name: "Shirin", farePaisa: 2400 },
+          {
+            name: "Nusrat",
+            farePaisa: 2400,
+            destinationZone: { id: expect.any(Number), name: "Mohakhali" },
+          },
+          {
+            name: "Rafiq",
+            farePaisa: 2400,
+            destinationZone: { id: expect.any(Number), name: "Mohakhali" },
+          },
+          {
+            name: "Shirin",
+            farePaisa: 2400,
+            destinationZone: { id: expect.any(Number), name: "Mohakhali" },
+          },
         ],
       }),
     ]);

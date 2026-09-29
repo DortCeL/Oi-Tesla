@@ -4,21 +4,31 @@
  * Booking:
  *   SHARED → join an existing WAITING ride at the same pickup when it fits
  *   otherwise stay REQUESTED until a driver accepts
+ *   a women-only or men-only booking only joins a pool where every passenger agrees
  * Accept:
  *   the driver starts a new ride on their Tesla (or joins an open shared pool)
  *   same pickup, destination, and type stack together; one accept takes who fits
+ *   gender-restricted bookings on the same route stay in separate stacks
  */
 import {
   Prisma,
   RequestStatus,
   RideStatus,
   RideType,
+  type Gender,
+  type PoolGenderPreference,
   type RideRequest,
 } from "@prisma/client";
 import { prisma } from "../db/prisma.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { recordRideEvent } from "./rideEvent.service.js";
 import { toRideRequestResponse } from "../utils/rideRequestMapper.js";
+import {
+  canJoinPool,
+  groupCompatibleRequests,
+  stackKey,
+  type GenderParty,
+} from "../utils/poolGender.js";
 import {
   hasEnoughSeats,
   isDestinationCompatible,
@@ -39,10 +49,45 @@ type MatchableRequest = Pick<
   | "destinationZoneId"
   | "seatsRequested"
   | "type"
+  | "poolGender"
   | "status"
   | "rideId"
   | "passengerId"
 >;
+
+const mateGenderSelect = {
+  destinationZoneId: true,
+  poolGender: true,
+  passenger: {
+    select: { user: { select: { gender: true } } },
+  },
+} as const;
+
+function partyOf(request: {
+  poolGender: PoolGenderPreference;
+  passenger: { user: { gender: Gender } };
+}): GenderParty {
+  return {
+    gender: request.passenger.user.gender,
+    poolGender: request.poolGender,
+  };
+}
+
+async function loadPassengerGender(
+  tx: Prisma.TransactionClient,
+  passengerId: string,
+): Promise<Gender> {
+  const user = await tx.user.findUnique({
+    where: { id: passengerId },
+    select: { gender: true },
+  });
+
+  if (!user) {
+    throw new AppError(404, "Passenger not found");
+  }
+
+  return user.gender;
+}
 
 /** Turn zone_distance rows into dist(from, to) for in-memory checks. */
 function buildDistanceLookup(
@@ -169,6 +214,12 @@ async function tryJoinSharedRide(
   tx: Prisma.TransactionClient,
   request: MatchableRequest,
 ) {
+  const incomingGender = await loadPassengerGender(tx, request.passengerId);
+  const incomingParty: GenderParty = {
+    gender: incomingGender,
+    poolGender: request.poolGender,
+  };
+
   const candidates = await tx.ride.findMany({
     where: {
       pickupZoneId: request.pickupZoneId,
@@ -183,7 +234,7 @@ async function tryJoinSharedRide(
     include: {
       requests: {
         where: { status: RequestStatus.MATCHED },
-        select: { destinationZoneId: true },
+        select: mateGenderSelect,
       },
     },
     orderBy: { createdAt: "asc" },
@@ -223,6 +274,10 @@ async function tryJoinSharedRide(
       continue;
     }
 
+    if (!canJoinPool(incomingParty, candidate.requests.map(partyOf))) {
+      continue;
+    }
+
     // Lock this ride so two passengers can't grab the last seat at once.
     await tx.$queryRaw(
       Prisma.sql`SELECT 1 FROM rides WHERE id = ${candidate.id} FOR UPDATE`,
@@ -233,7 +288,7 @@ async function tryJoinSharedRide(
       include: {
         requests: {
           where: { status: RequestStatus.MATCHED },
-          select: { destinationZoneId: true },
+          select: mateGenderSelect,
         },
       },
     });
@@ -265,6 +320,10 @@ async function tryJoinSharedRide(
         lockedDestinations,
       )
     ) {
+      continue;
+    }
+
+    if (!canJoinPool(incomingParty, lockedRide.requests.map(partyOf))) {
       continue;
     }
 
@@ -384,7 +443,7 @@ export async function listOpenRequestStacksForDriver(driverId: string) {
     include: {
       ...rideRequestInclude,
       passenger: {
-        include: { user: { select: { name: true } } },
+        include: { user: { select: { name: true, gender: true } } },
       },
     },
     orderBy: { createdAt: "asc" },
@@ -413,43 +472,52 @@ export async function listOpenRequestStacksForDriver(driverId: string) {
     }
   }
 
-  const stacks = [...buckets.values()].map((bucket) => {
-    const passengers = bucket.requests.map((req) => ({
-      requestId: req.id,
-      name: req.passenger.user.name,
-      farePaisa: req.farePaisa,
-      seatsRequested: req.seatsRequested,
-    }));
+  const stacks = [...buckets.values()].flatMap((bucket) => {
+    const groups =
+      bucket.type === RideType.SHARED
+        ? groupCompatibleRequests(bucket.requests, partyOf)
+        : [bucket.requests];
 
-    const fit = selectFitRequests(
-      bucket.type,
-      capacity,
-      bucket.requests.map((req) => ({
-        id: req.id,
-        seatsRequested: req.seatsRequested,
+    return groups.map((group) => {
+      const passengers = group.map((req) => ({
+        requestId: req.id,
+        name: req.passenger.user.name,
         farePaisa: req.farePaisa,
-      })),
-    );
+        seatsRequested: req.seatsRequested,
+      }));
 
-    const waitingSeats = bucket.requests.reduce(
-      (sum, req) => sum + req.seatsRequested,
-      0,
-    );
+      const fit = selectFitRequests(
+        bucket.type,
+        capacity,
+        group.map((req) => ({
+          id: req.id,
+          seatsRequested: req.seatsRequested,
+          farePaisa: req.farePaisa,
+        })),
+      );
 
-    return {
-      key: `${bucket.pickupZone.id}:${bucket.destinationZone.id}:${bucket.type}`,
-      pickupZone: bucket.pickupZone,
-      destinationZone: bucket.destinationZone,
-      type: bucket.type,
-      capacity,
-      waitingCount: bucket.requests.length,
-      waitingSeats,
-      passengers,
-      acceptCount: fit.length,
-      acceptSeats: fit.reduce((sum, req) => sum + req.seatsRequested, 0),
-      totalFarePaisa: fit.reduce((sum, req) => sum + req.farePaisa, 0),
-      acceptRequestIds: fit.map((req) => req.id),
-    };
+      const waitingSeats = group.reduce((sum, req) => sum + req.seatsRequested, 0);
+
+      return {
+        key: stackKey(
+          bucket.pickupZone.id,
+          bucket.destinationZone.id,
+          bucket.type,
+          group[0].id,
+        ),
+        pickupZone: bucket.pickupZone,
+        destinationZone: bucket.destinationZone,
+        type: bucket.type,
+        capacity,
+        waitingCount: group.length,
+        waitingSeats,
+        passengers,
+        acceptCount: fit.length,
+        acceptSeats: fit.reduce((sum, req) => sum + req.seatsRequested, 0),
+        totalFarePaisa: fit.reduce((sum, req) => sum + req.farePaisa, 0),
+        acceptRequestIds: fit.map((req) => req.id),
+      };
+    });
   });
 
   stacks.sort((a, b) => b.totalFarePaisa - a.totalFarePaisa);
@@ -460,6 +528,7 @@ export type AcceptStackInput = {
   pickupZoneId: number;
   destinationZoneId: number;
   type: RideType;
+  stackKey?: string;
 };
 
 /** Accept one stack: start a ride and match every request that fits. */
@@ -500,6 +569,12 @@ export async function acceptRequestStack(driverId: string, input: AcceptStackInp
       throw new AppError(400, "Finish your current ride before accepting another");
     }
 
+    const genderInclude = {
+      passenger: {
+        include: { user: { select: { gender: true } } },
+      },
+    } satisfies Prisma.RideRequestInclude;
+
     const open = await tx.rideRequest.findMany({
       where: {
         status: RequestStatus.REQUESTED,
@@ -508,6 +583,7 @@ export async function acceptRequestStack(driverId: string, input: AcceptStackInp
         destinationZoneId: input.destinationZoneId,
         type: input.type,
       },
+      include: genderInclude,
       orderBy: { createdAt: "asc" },
     });
 
@@ -527,6 +603,7 @@ export async function acceptRequestStack(driverId: string, input: AcceptStackInp
         status: RequestStatus.REQUESTED,
         rideId: null,
       },
+      include: genderInclude,
       orderBy: { createdAt: "asc" },
     });
 
@@ -534,10 +611,30 @@ export async function acceptRequestStack(driverId: string, input: AcceptStackInp
       throw new AppError(400, "No open requests on this route");
     }
 
+    const groups =
+      input.type === RideType.SHARED
+        ? groupCompatibleRequests(locked, partyOf)
+        : [locked];
+    const chosen = input.stackKey
+      ? groups.find(
+          (group) =>
+            stackKey(
+              input.pickupZoneId,
+              input.destinationZoneId,
+              input.type,
+              group[0].id,
+            ) === input.stackKey,
+        )
+      : groups[0];
+
+    if (!chosen) {
+      throw new AppError(400, "That pool is no longer available");
+    }
+
     const fit = selectFitRequests(
       input.type,
       tesla.capacity,
-      locked.map((req) => ({
+      chosen.map((req) => ({
         id: req.id,
         seatsRequested: req.seatsRequested,
         farePaisa: req.farePaisa,

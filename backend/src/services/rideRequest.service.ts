@@ -1,9 +1,10 @@
-import { Prisma, RequestStatus, RideStatus } from "@prisma/client";
+import { PoolGenderPreference, Prisma, RequestStatus, RideStatus, RideType } from "@prisma/client";
 import { prisma } from "../db/prisma.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { calculateFare } from "../utils/fare.js";
 import { maybeApplyQueuedOffline } from "./driverOffline.service.js";
 import { recordRideEvent } from "./rideEvent.service.js";
+import { preferenceMatchesOwnGender } from "../utils/poolGender.js";
 import { tryMatchRideRequest } from "./pooling.service.js";
 import { toRideRequestResponse } from "../utils/rideRequestMapper.js";
 import type {
@@ -61,10 +62,23 @@ export async function createRideRequest(
 ) {
   const passenger = await prisma.passenger.findUnique({
     where: { userId: passengerId },
+    include: { user: { select: { gender: true } } },
   });
 
   if (!passenger) {
     throw new AppError(404, "Passenger not found");
+  }
+
+  const poolGender =
+    input.type === RideType.SOLO
+      ? PoolGenderPreference.ANY
+      : (input.poolGender ?? PoolGenderPreference.ANY);
+
+  if (
+    input.type === RideType.SHARED &&
+    !preferenceMatchesOwnGender(passenger.user.gender, poolGender)
+  ) {
+    throw new AppError(400, "You can only share with anyone or with your own gender");
   }
 
   const fare = await resolveFare(input);
@@ -76,6 +90,7 @@ export async function createRideRequest(
       destinationZoneId: input.destinationZoneId,
       seatsRequested: input.seatsRequested,
       type: input.type,
+      poolGender,
       paymentMethod: input.paymentMethod,
       baseFarePaisa: fare.baseFarePaisa,
       distanceChargePaisa: fare.distanceChargePaisa,
@@ -202,7 +217,7 @@ export async function getRideRequestPoolMates(
       destinationZone: { select: { id: true, name: true } },
       passenger: {
         include: {
-          user: { select: { name: true, gender: true, hobbies: true } },
+          user: { select: { name: true, gender: true } },
         },
       },
     },
@@ -212,13 +227,6 @@ export async function getRideRequestPoolMates(
     poolMates: mates.map((mate) => ({
       name: mate.passenger.user.name,
       gender: mate.passenger.user.gender,
-      hobbies: mate.passenger.user.hobbies,
-      occupation: mate.passenger.occupation,
-      affiliation: mate.passenger.affiliation,
-      seatsRequested: mate.seatsRequested,
-      type: mate.type,
-      paymentMethod: mate.paymentMethod,
-      farePaisa: mate.farePaisa,
       destinationZone: mate.destinationZone,
     })),
   };

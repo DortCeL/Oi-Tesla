@@ -79,9 +79,18 @@ describe("PRD rush-hour story", () => {
     );
     expect(driverRide.totalFarePaisa).toBe(8700);
     expect(driverRide.passengers).toEqual([
-      { name: "Nusrat", farePaisa: 5100 },
-      { name: "Rafiq", farePaisa: 3600 },
+      {
+        name: "Nusrat",
+        farePaisa: 5100,
+        destinationZone: { id: bashundhara, name: "Bashundhara" },
+      },
+      {
+        name: "Rafiq",
+        farePaisa: 3600,
+        destinationZone: { id: gulshan, name: "Gulshan 1" },
+      },
     ]);
+    expect(JSON.stringify(driverRide.passengers)).not.toMatch(/gender|occupation|hobbies|affiliation/i);
   });
 
   it("doubles a shared fare for two seats and keeps a reserved ride at one price", async () => {

@@ -1,4 +1,5 @@
 export type RideType = "SOLO" | "SHARED";
+export type PoolGender = "ANY" | "FEMALE_ONLY" | "MALE_ONLY";
 export type PaymentMethod = "CASH" | "TESLAPAY";
 export type RequestStatus =
   | "REQUESTED"
@@ -31,6 +32,7 @@ export type RideRequest = {
   id: string;
   status: RequestStatus;
   type: RideType;
+  poolGender: PoolGender;
   seatsRequested: number;
   paymentMethod: PaymentMethod;
   baseFarePaisa: number;
@@ -56,13 +58,6 @@ export type RideSummary = {
 export type PoolMate = {
   name: string;
   gender: string;
-  hobbies: string[];
-  occupation: string | null;
-  affiliation: string | null;
-  seatsRequested: number;
-  type: RideType;
-  paymentMethod: PaymentMethod;
-  farePaisa: number;
   destinationZone: Zone;
 };
 
@@ -78,5 +73,5 @@ export type DriverRide = {
   createdAt: string;
   pickupZone: Zone;
   totalFarePaisa: number;
-  passengers: { name: string; farePaisa: number }[];
+  passengers: { name: string; farePaisa: number; destinationZone: Zone }[];
 };
