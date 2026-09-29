@@ -16,10 +16,6 @@ export async function clientLoader() {
 
 export async function clientAction({ request }: Route.ClientActionArgs) {
   const form = await request.formData();
-  const hobbiesRaw = String(form.get("hobbies") ?? "").trim();
-  const hobbies = hobbiesRaw
-    ? hobbiesRaw.split(",").map((h) => h.trim()).filter(Boolean)
-    : undefined;
 
   const body = {
     name: String(form.get("name") ?? "").trim(),
@@ -27,9 +23,6 @@ export async function clientAction({ request }: Route.ClientActionArgs) {
     phone: String(form.get("phone") ?? "").trim(),
     password: String(form.get("password") ?? ""),
     gender: String(form.get("gender") ?? "MALE"),
-    occupation: String(form.get("occupation") ?? "").trim() || undefined,
-    affiliation: String(form.get("affiliation") ?? "").trim() || undefined,
-    hobbies,
   };
 
   if (!body.name || !body.email || !body.phone || !body.password) {
@@ -111,22 +104,6 @@ export default function SignupPassenger() {
             Female
           </label>
         </div>
-
-        <input
-          name="occupation"
-          placeholder="Occupation (optional)"
-          className="input"
-        />
-        <input
-          name="affiliation"
-          placeholder="Affiliation (optional)"
-          className="input"
-        />
-        <input
-          name="hobbies"
-          placeholder="Hobbies, comma-separated (optional)"
-          className="input"
-        />
 
         {actionData?.error ? (
           <p className="text-sm text-red-600">{actionData.error}</p>

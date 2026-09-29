@@ -6,7 +6,7 @@ import { StatusBadge } from "../components/StatusBadge";
 import { passengerNav } from "../components/TopNav";
 import { getAuth } from "../lib/auth.client";
 import { authFetch, authJson } from "../lib/fetch.client";
-import { formatGender, formatPaisa, formatRideType } from "../lib/format";
+import { formatGender, formatPaisa, formatPoolGender, formatRideType } from "../lib/format";
 import type { PoolMate, RideRequest, RideSummary } from "../lib/types";
 
 type PollResult = {
@@ -163,6 +163,9 @@ export default function PassengerRide() {
               {formatRideType(req.type)} · {req.seatsRequested} seat
               {req.seatsRequested === 1 ? "" : "s"}
               {data.ride ? ` · pool ${data.ride.seatsTaken}/${data.ride.capacity}` : ""}
+              {req.type === "SHARED" && req.poolGender !== "ANY"
+                ? ` · ${formatPoolGender(req.poolGender)}`
+                : ""}
             </p>
 
             <div className="mt-4 rounded-xl bg-emerald-50 p-4 ring-1 ring-emerald-100">
@@ -204,33 +207,11 @@ export default function PassengerRide() {
                     key={`${mate.name}-${index}`}
                     className="rounded-xl bg-gray-50 p-4 ring-1 ring-gray-100"
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-lg font-semibold text-gray-900">{mate.name}</p>
-                        <p className="text-sm text-gray-500">
-                          {formatGender(mate.gender)}
-                          {mate.occupation ? ` · ${mate.occupation}` : ""}
-                        </p>
-                      </div>
-                      <p className="shrink-0 text-sm font-medium text-gray-700">
-                        {mate.seatsRequested} seat{mate.seatsRequested === 1 ? "" : "s"}
-                      </p>
-                    </div>
-                    <p className="mt-3 text-sm font-medium text-gray-800">
+                    <p className="text-lg font-semibold text-gray-900">{mate.name}</p>
+                    <p className="text-sm text-gray-500">{formatGender(mate.gender)}</p>
+                    <p className="mt-2 text-sm font-medium text-gray-800">
                       Going to {mate.destinationZone.name}
                     </p>
-                    <p className="mt-1 text-sm text-gray-500">
-                      {formatRideType(mate.type)} · their fare {formatPaisa(mate.farePaisa)} ·{" "}
-                      {mate.paymentMethod === "TESLAPAY" ? "TeslaPay" : "Cash"}
-                    </p>
-                    {mate.affiliation ? (
-                      <p className="mt-2 text-sm text-gray-600">{mate.affiliation}</p>
-                    ) : null}
-                    {mate.hobbies.length > 0 ? (
-                      <p className="mt-2 text-sm text-gray-600">
-                        Hobbies: {mate.hobbies.join(", ")}
-                      </p>
-                    ) : null}
                   </li>
                 ))}
               </ul>

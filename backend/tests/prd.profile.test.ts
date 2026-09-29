@@ -44,19 +44,20 @@ describe("passenger profile fields", () => {
     await removeBlankPassenger();
   });
 
-  it("returns filled profile fields for Nusrat", async () => {
+  it("returns name and gender without occupation, affiliation, or hobbies", async () => {
     const token = await login("nusrat@oitesla.test");
     const res = await request(app)
       .get("/api/auth/passenger/me")
       .set("Authorization", `Bearer ${token}`);
 
     expect(res.status).toBe(200);
-    expect(res.body.user.passenger.occupation).toBe("Software Engineer");
-    expect(res.body.user.passenger.affiliation).toBe("Grameenphone");
-    expect(res.body.user.hobbies).toEqual(["reading", "music"]);
+    expect(res.body.user.name).toBe("Nusrat");
+    expect(res.body.user.gender).toBe("FEMALE");
+    const payload = JSON.stringify(res.body);
+    expect(payload).not.toMatch(/occupation|affiliation|hobbies/i);
   });
 
-  it("stores blank optional fields as empty, not a placeholder", async () => {
+  it("registers a passenger with name, phone, and gender only", async () => {
     const registered = await request(app).post("/api/auth/passenger/register").send({
       name: "Blank Profile",
       email: blankEmail,
@@ -66,21 +67,12 @@ describe("passenger profile fields", () => {
     });
 
     expect(registered.status).toBe(201);
-    expect(registered.body.user.passenger.occupation).toBeNull();
-    expect(registered.body.user.passenger.affiliation).toBeNull();
-    expect(registered.body.user.hobbies).toEqual([]);
-
-    const me = await request(app)
-      .get("/api/auth/passenger/me")
-      .set("Authorization", `Bearer ${registered.body.token}`);
-
-    expect(me.status).toBe(200);
-    expect(me.body.user.passenger.occupation).toBeNull();
-    expect(me.body.user.passenger.affiliation).toBeNull();
-    expect(me.body.user.hobbies).toEqual([]);
+    expect(registered.body.user.name).toBe("Blank Profile");
+    expect(registered.body.user.gender).toBe("FEMALE");
+    expect(JSON.stringify(registered.body)).not.toMatch(/occupation|affiliation|hobbies/i);
   });
 
-  it("shares filled profile fields with pool mates and leaves blanks empty", async () => {
+  it("shows pool mates name, gender, and destination only", async () => {
     const banani = await getZoneId("Banani");
     const bashundhara = await getZoneId("Bashundhara");
     const driverToken = await login("jashim@oitesla.test");
@@ -120,28 +112,14 @@ describe("passenger profile fields", () => {
       .set("Authorization", `Bearer ${nusratToken}`);
     expect(seenByNusrat.status).toBe(200);
     expect(seenByNusrat.body.poolMates).toEqual([
-      expect.objectContaining({
+      {
         name: "Blank Profile",
-        occupation: null,
-        affiliation: null,
-        hobbies: [],
-      }),
+        gender: "FEMALE",
+        destinationZone: { id: bashundhara, name: "Bashundhara" },
+      },
     ]);
 
-    const seenByBlank = await request(app)
-      .get(`/api/ride-requests/${blankRide.body.request.id}/pool-mates`)
-      .set("Authorization", `Bearer ${registered.body.token}`);
-    expect(seenByBlank.status).toBe(200);
-    expect(seenByBlank.body.poolMates).toEqual([
-      expect.objectContaining({
-        name: "Nusrat",
-        occupation: "Software Engineer",
-        affiliation: "Grameenphone",
-        hobbies: ["reading", "music"],
-      }),
-    ]);
-
-    const payload = JSON.stringify(seenByNusrat.body) + JSON.stringify(seenByBlank.body);
-    expect(payload).not.toContain("N/A");
+    const payload = JSON.stringify(seenByNusrat.body);
+    expect(payload).not.toMatch(/fare|occupation|affiliation|hobbies|payment/i);
   });
 });

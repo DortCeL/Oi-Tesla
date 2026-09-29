@@ -3,18 +3,13 @@ import type { Route } from "./+types/passenger.profile";
 import { passengerNav } from "../components/TopNav";
 import { getAuth } from "../lib/auth.client";
 import { authJson } from "../lib/fetch.client";
-import { displayHobbies, displayOptional, formatGender } from "../lib/format";
+import { formatGender } from "../lib/format";
 
 type PassengerProfile = {
   name: string;
   email: string;
   phone: string;
   gender: string;
-  hobbies: string[];
-  passenger: {
-    occupation: string | null;
-    affiliation: string | null;
-  } | null;
 };
 
 export function meta({}: Route.MetaArgs) {
@@ -58,18 +53,6 @@ export default function PassengerProfilePage() {
         <div>
           <dt className="text-gray-500">Gender</dt>
           <dd>{formatGender(user.gender)}</dd>
-        </div>
-        <div>
-          <dt className="text-gray-500">Occupation</dt>
-          <dd>{displayOptional(user.passenger?.occupation)}</dd>
-        </div>
-        <div>
-          <dt className="text-gray-500">Affiliation</dt>
-          <dd>{displayOptional(user.passenger?.affiliation)}</dd>
-        </div>
-        <div>
-          <dt className="text-gray-500">Hobbies</dt>
-          <dd>{displayHobbies(user.hobbies)}</dd>
         </div>
       </dl>
       </div>

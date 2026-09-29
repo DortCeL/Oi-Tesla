@@ -1,6 +1,7 @@
-/** Driver-facing passenger: name and the fare they pay. */
+/** Driver-facing passenger: name, where they are going, and the fare they pay. */
 type DriverPassengerRecord = {
   farePaisa: number;
+  destinationZone: { id: number; name: string };
   passenger: {
     user: { name: string };
   };
@@ -9,6 +10,7 @@ type DriverPassengerRecord = {
 export function toDriverPassengerResponse(request: DriverPassengerRecord) {
   return {
     name: request.passenger.user.name,
+    destinationZone: request.destinationZone,
     farePaisa: request.farePaisa,
   };
 }

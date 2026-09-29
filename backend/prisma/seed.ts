@@ -115,7 +115,6 @@ async function main() {
       passwordHash,
       role: Role.DRIVER,
       gender: Gender.MALE,
-      hobbies: ["football", "cricket"],
       driver: {
         create: { isOnline: false },
       },
@@ -140,12 +139,8 @@ async function main() {
       passwordHash,
       role: Role.PASSENGER,
       gender: Gender.FEMALE,
-      hobbies: ["reading", "music"],
       passenger: {
-        create: {
-          occupation: "Software Engineer",
-          affiliation: "Grameenphone",
-        },
+        create: {},
       },
     },
   });
@@ -159,12 +154,8 @@ async function main() {
       passwordHash,
       role: Role.PASSENGER,
       gender: Gender.MALE,
-      hobbies: ["photography"],
       passenger: {
-        create: {
-          occupation: "Bank Officer",
-          affiliation: "BRAC Bank",
-        },
+        create: {},
       },
     },
   });
@@ -178,12 +169,8 @@ async function main() {
       passwordHash,
       role: Role.PASSENGER,
       gender: Gender.FEMALE,
-      hobbies: ["cooking", "travel"],
       passenger: {
-        create: {
-          occupation: "Student",
-          affiliation: "North South University",
-        },
+        create: {},
       },
     },
   });

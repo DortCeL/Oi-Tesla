@@ -1,4 +1,4 @@
-import { Prisma, RequestStatus, RideStatus } from "@prisma/client";
+import { PoolGenderPreference, Prisma, RequestStatus, RideStatus, RideType } from "@prisma/client";
 import { prisma } from "../db/prisma.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { calculateFare } from "../utils/fare.js";
@@ -76,6 +76,10 @@ export async function createRideRequest(
       destinationZoneId: input.destinationZoneId,
       seatsRequested: input.seatsRequested,
       type: input.type,
+      poolGender:
+        input.type === RideType.SOLO
+          ? PoolGenderPreference.ANY
+          : (input.poolGender ?? PoolGenderPreference.ANY),
       paymentMethod: input.paymentMethod,
       baseFarePaisa: fare.baseFarePaisa,
       distanceChargePaisa: fare.distanceChargePaisa,
@@ -202,7 +206,7 @@ export async function getRideRequestPoolMates(
       destinationZone: { select: { id: true, name: true } },
       passenger: {
         include: {
-          user: { select: { name: true, gender: true, hobbies: true } },
+          user: { select: { name: true, gender: true } },
         },
       },
     },
@@ -212,13 +216,6 @@ export async function getRideRequestPoolMates(
     poolMates: mates.map((mate) => ({
       name: mate.passenger.user.name,
       gender: mate.passenger.user.gender,
-      hobbies: mate.passenger.user.hobbies,
-      occupation: mate.passenger.occupation,
-      affiliation: mate.passenger.affiliation,
-      seatsRequested: mate.seatsRequested,
-      type: mate.type,
-      paymentMethod: mate.paymentMethod,
-      farePaisa: mate.farePaisa,
       destinationZone: mate.destinationZone,
     })),
   };
