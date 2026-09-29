@@ -478,8 +478,7 @@ export default function DriverHome() {
           <h2 className="mb-3 text-lg font-semibold">Incoming routes</h2>
           {stacks.length === 0 ? (
             <div className="card text-sm text-gray-500">
-              No open requests in your zones. Same pickup and destination bookings stack
-              here so you can accept a pool in one tap.
+              No open requests in your zones.
             </div>
           ) : (
             <ul className="space-y-3">
@@ -500,58 +499,55 @@ export default function DriverHome() {
                   <li key={stack.key} className="card">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="text-xl font-bold text-gray-900">
+                        <p className="text-lg font-bold text-gray-900">
                           {stack.pickupZone.name} → {stack.destinationZone.name}
                         </p>
-                        <p className="mt-1 text-sm text-gray-500">
+                        <p className="mt-0.5 text-sm text-gray-500">
                           {formatRideType(stack.type)} · {stack.acceptCount} of{" "}
                           {stack.waitingCount} passenger
                           {stack.waitingCount === 1 ? "" : "s"} · {stack.acceptSeats}/
                           {stack.capacity} seats
-                          {overflow > 0 ? ` · +${overflow} wait for next car` : ""}
+                          {overflow > 0 ? ` · ${overflow} for the next car` : ""}
                         </p>
-                        {separatePool ? (
-                          <p className="mt-1 text-sm text-gray-500">
-                            Separate pool. These passengers stay together and are not mixed
-                            with the other group on this route.
-                          </p>
-                        ) : null}
                       </div>
-                      <span className="shrink-0 rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-bold text-white">
-                        {formatRideType(stack.type)}
-                      </span>
-                    </div>
-
-                    <div className="mt-4 rounded-xl bg-emerald-50 px-4 py-3 ring-1 ring-emerald-200">
-                      <p className="text-xs font-bold uppercase tracking-wide text-emerald-800">
-                        You earn if you accept
-                      </p>
-                      <p className="mt-0.5 text-3xl font-bold text-emerald-950">
-                        {formatPaisa(stack.totalFarePaisa)}
+                      <p className="shrink-0 text-right">
+                        <span className="block text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                          Earn
+                        </span>
+                        <span className="text-lg font-bold text-emerald-800">
+                          {formatPaisa(stack.totalFarePaisa)}
+                        </span>
                       </p>
                     </div>
 
-                    <ul className="mt-3 space-y-1.5">
+
+                    <ul className="mt-3 space-y-1 rounded-xl bg-gray-50 px-3 py-2 ring-1 ring-gray-100">
                       {stack.passengers.map((passenger) => {
                         const included = stack.acceptRequestIds.includes(passenger.requestId);
                         return (
                           <li
                             key={passenger.requestId}
                             className={[
-                              "flex items-center justify-between gap-2 text-sm",
+                              "flex flex-wrap items-baseline gap-x-2 py-1 text-sm",
                               included ? "text-gray-900" : "text-gray-400",
                             ].join(" ")}
                           >
-                            <span>
-                              {passenger.name}
-                              {passenger.seatsRequested > 1
-                                ? ` · ${passenger.seatsRequested} seats`
-                                : ""}
-                              {included ? "" : " (next car)"}
-                            </span>
-                            <span className="font-semibold">
+                            <span className="font-semibold">{passenger.name}</span>
+                            <span
+                              className={
+                                included ? "font-semibold text-emerald-800" : "font-semibold"
+                              }
+                            >
                               {formatPaisa(passenger.farePaisa)}
                             </span>
+                            {passenger.seatsRequested > 1 ? (
+                              <span className="text-xs text-gray-500">
+                                {passenger.seatsRequested} seats
+                              </span>
+                            ) : null}
+                            {included ? null : (
+                              <span className="text-xs text-gray-400">Next car</span>
+                            )}
                           </li>
                         );
                       })}
@@ -561,7 +557,7 @@ export default function DriverHome() {
                       type="button"
                       disabled={!canAccept || acceptingKey === stack.key}
                       onClick={() => void acceptStack(stack)}
-                      className="btn-primary mt-4 w-full py-3 text-base font-semibold"
+                      className="btn-primary mt-3 w-full py-2.5 text-sm font-semibold"
                     >
                       {acceptingKey === stack.key
                         ? "Accepting…"
@@ -570,8 +566,8 @@ export default function DriverHome() {
                             ? "Finish current ride first"
                             : "Going offline after this ride"
                           : stack.acceptCount > 1
-                            ? `Accept pool · ${formatPaisa(stack.totalFarePaisa)}`
-                            : `Accept · ${formatPaisa(stack.totalFarePaisa)}`}
+                            ? "Accept pool"
+                            : "Accept"}
                     </button>
                   </li>
                 );

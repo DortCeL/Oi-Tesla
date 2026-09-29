@@ -174,6 +174,33 @@ describe("shared pool gender preference", () => {
     expect(JSON.stringify(ride.passengers)).not.toMatch(/gender/i);
   });
 
+  it("rejects a shared booking for the other gender", async () => {
+    const banani = await getZoneId("Banani");
+    const gulshan = await getZoneId("Gulshan 1");
+    const rafiqToken = await login("rafiq@oitesla.test");
+    const nusratToken = await login("nusrat@oitesla.test");
+
+    const manAsksForWomen = await createRideRequest(rafiqToken, {
+      pickupZoneId: banani,
+      destinationZoneId: gulshan,
+      type: "SHARED",
+      seatsRequested: 1,
+      paymentMethod: "CASH",
+      poolGender: "FEMALE_ONLY",
+    });
+    expect(manAsksForWomen.status).toBe(400);
+
+    const womanAsksForMen = await createRideRequest(nusratToken, {
+      pickupZoneId: banani,
+      destinationZoneId: gulshan,
+      type: "SHARED",
+      seatsRequested: 1,
+      paymentMethod: "CASH",
+      poolGender: "MALE_ONLY",
+    });
+    expect(womanAsksForMen.status).toBe(400);
+  });
+
   it("ignores a gender preference on a fully reserved ride", async () => {
     const banani = await getZoneId("Banani");
     const mohakhali = await getZoneId("Mohakhali");

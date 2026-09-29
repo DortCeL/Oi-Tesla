@@ -5,6 +5,16 @@ export type GenderParty = {
   poolGender: PoolGenderPreference;
 };
 
+/** A passenger may ask for anyone, or for their own gender only. */
+export function preferenceMatchesOwnGender(
+  gender: Gender,
+  poolGender: PoolGenderPreference,
+): boolean {
+  if (poolGender === "ANY") return true;
+  if (poolGender === "FEMALE_ONLY") return gender === "FEMALE";
+  return gender === "MALE";
+}
+
 function allows(party: GenderParty, otherGender: Gender): boolean {
   if (party.poolGender === "ANY") return true;
   if (party.poolGender === "FEMALE_ONLY") return otherGender === "FEMALE";

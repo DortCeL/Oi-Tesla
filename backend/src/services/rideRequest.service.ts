@@ -4,6 +4,7 @@ import { AppError } from "../middleware/errorHandler.js";
 import { calculateFare } from "../utils/fare.js";
 import { maybeApplyQueuedOffline } from "./driverOffline.service.js";
 import { recordRideEvent } from "./rideEvent.service.js";
+import { preferenceMatchesOwnGender } from "../utils/poolGender.js";
 import { tryMatchRideRequest } from "./pooling.service.js";
 import { toRideRequestResponse } from "../utils/rideRequestMapper.js";
 import type {
@@ -61,10 +62,23 @@ export async function createRideRequest(
 ) {
   const passenger = await prisma.passenger.findUnique({
     where: { userId: passengerId },
+    include: { user: { select: { gender: true } } },
   });
 
   if (!passenger) {
     throw new AppError(404, "Passenger not found");
+  }
+
+  const poolGender =
+    input.type === RideType.SOLO
+      ? PoolGenderPreference.ANY
+      : (input.poolGender ?? PoolGenderPreference.ANY);
+
+  if (
+    input.type === RideType.SHARED &&
+    !preferenceMatchesOwnGender(passenger.user.gender, poolGender)
+  ) {
+    throw new AppError(400, "You can only share with anyone or with your own gender");
   }
 
   const fare = await resolveFare(input);
@@ -76,10 +90,7 @@ export async function createRideRequest(
       destinationZoneId: input.destinationZoneId,
       seatsRequested: input.seatsRequested,
       type: input.type,
-      poolGender:
-        input.type === RideType.SOLO
-          ? PoolGenderPreference.ANY
-          : (input.poolGender ?? PoolGenderPreference.ANY),
+      poolGender,
       paymentMethod: input.paymentMethod,
       baseFarePaisa: fare.baseFarePaisa,
       distanceChargePaisa: fare.distanceChargePaisa,

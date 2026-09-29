@@ -7,7 +7,7 @@ import { ZoneSelect } from "../components/ZoneSelect";
 import { apiUrl } from "../lib/api";
 import { getAuth } from "../lib/auth.client";
 import { authFetch, authJson } from "../lib/fetch.client";
-import { formatPaisa, formatRideType } from "../lib/format";
+import { formatPaisa } from "../lib/format";
 import type { FareEstimate, PoolGender, RideRequest, RideType, Zone } from "../lib/types";
 
 export function meta({}: Route.MetaArgs) {
@@ -36,11 +36,15 @@ export async function clientLoader() {
     if (err instanceof Response) throw err;
   }
 
-  return { name: auth.name, zones: zonesData.zones };
+  const me = await authJson<{ user: { gender: "MALE" | "FEMALE" } }>(
+    "/auth/passenger/me",
+  );
+
+  return { name: auth.name, zones: zonesData.zones, gender: me.user.gender };
 }
 
 export default function PassengerHome() {
-  const { name, zones } = useLoaderData<typeof clientLoader>();
+  const { name, zones, gender } = useLoaderData<typeof clientLoader>();
   const navigate = useNavigate();
 
   const [pickupZoneId, setPickupZoneId] = useState("");
@@ -63,6 +67,11 @@ export default function PassengerHome() {
   const destinationOptions = zones
     .filter((zone) => String(zone.id) !== pickupZoneId)
     .map((zone) => ({ value: String(zone.id), label: zone.name }));
+
+  function chooseType(next: RideType) {
+    setType(next);
+    if (next === "SOLO") setSeatsRequested(1);
+  }
 
   const tripReady =
     Boolean(pickupZoneId) &&
@@ -196,33 +205,25 @@ export default function PassengerHome() {
           <ChoiceTabs
             label="Ride type"
             value={type}
-            onChange={(next) => {
-              setType(next as RideType);
-              if (next === "SOLO") setSeatsRequested(1);
-            }}
+            onChange={(next) => chooseType(next as RideType)}
             options={[
               { value: "SOLO", label: "Fully Reserved" },
               { value: "SHARED", label: "Shared" },
             ]}
           />
 
-          {type === "SHARED" ? (
-            <div>
-              <ChoiceTabs
-                label="Share with"
-                value={poolGender}
-                onChange={(next) => setPoolGender(next as PoolGender)}
-                options={[
-                  { value: "ANY", label: "Anyone" },
-                  { value: "FEMALE_ONLY", label: "Women only" },
-                  { value: "MALE_ONLY", label: "Men only" },
-                ]}
-              />
-              <p className="mt-1.5 text-xs text-gray-500">
-                Women only rides with women. Men only rides with men. Anyone can share with either.
-              </p>
-            </div>
-          ) : null}
+          <ChoiceTabs
+            label="Share with"
+            value={poolGender}
+            onChange={(next) => setPoolGender(next as PoolGender)}
+            disabled={type === "SOLO"}
+            options={[
+              { value: "ANY", label: "Anyone" },
+              gender === "FEMALE"
+                ? { value: "FEMALE_ONLY", label: "Women only" }
+                : { value: "MALE_ONLY", label: "Men only" },
+            ]}
+          />
 
           <ChoiceTabs
             label="Seats"
@@ -246,21 +247,57 @@ export default function PassengerHome() {
           />
 
           {tripReady && soloFare && sharedFare ? (
-            <div className="rounded-xl bg-emerald-50 p-4 text-sm ring-1 ring-emerald-100">
-              <p className="font-medium">Fare preview</p>
-              <p className="mt-1">Fully Reserved: {formatPaisa(soloFare.farePaisa)}</p>
-              <p>
-                Shared: {formatPaisa(sharedFare.farePaisa)}
-                {sharedFare.poolDiscountPaisa > 0
-                  ? ` (−${formatPaisa(sharedFare.poolDiscountPaisa)} pool discount)`
-                  : ""}
-              </p>
-              <p className="mt-2 text-gray-600">
-                Your selection ({formatRideType(type)}):{" "}
-                <strong>
-                  {formatPaisa(type === "SOLO" ? soloFare.farePaisa : sharedFare.farePaisa)}
-                </strong>
-              </p>
+            <div>
+              <p className="mb-1.5 text-xs font-medium text-gray-600">Fare preview</p>
+              <div className="grid grid-cols-2 gap-2">
+                {(
+                  [
+                    {
+                      value: "SOLO" as const,
+                      label: "Fully Reserved",
+                      fare: soloFare.farePaisa,
+                      note: "The whole Tesla",
+                    },
+                    {
+                      value: "SHARED" as const,
+                      label: "Shared",
+                      fare: sharedFare.farePaisa,
+                      note:
+                        sharedFare.poolDiscountPaisa > 0
+                          ? `${formatPaisa(sharedFare.poolDiscountPaisa)} off`
+                          : "Split the ride",
+                    },
+                  ] as const
+                ).map((option) => {
+                  const selected = type === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => chooseType(option.value)}
+                      className={[
+                        "rounded-xl px-3 py-3 text-left ring-1 transition",
+                        selected
+                          ? "bg-emerald-50 ring-emerald-600"
+                          : "bg-white ring-gray-200 hover:ring-emerald-300",
+                      ].join(" ")}
+                    >
+                      <span className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-medium text-gray-600">{option.label}</span>
+                        {selected ? (
+                          <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+                            Selected
+                          </span>
+                        ) : null}
+                      </span>
+                      <span className="mt-1 block text-2xl font-bold text-gray-900">
+                        {formatPaisa(option.fare)}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-gray-500">{option.note}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           ) : null}
 
