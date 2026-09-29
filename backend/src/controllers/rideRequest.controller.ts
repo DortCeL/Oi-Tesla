@@ -14,6 +14,14 @@ import {
   rideRequestEstimateSchema,
 } from "../validators/rideRequest.validator.js";
 
+function getRequestIdParam(req: Request): string {
+  const requestId = req.params.id;
+  if (typeof requestId !== "string") {
+    throw new AppError(400, "Invalid request id");
+  }
+  return requestId;
+}
+
 export async function estimateRideRequestHandler(
   req: Request,
   res: Response,
@@ -58,7 +66,7 @@ export async function getPassengerRideRequestHandler(
       return;
     }
 
-    const result = await getPassengerRideRequest(req.user.id, req.params.id);
+    const result = await getPassengerRideRequest(req.user.id, getRequestIdParam(req));
     res.json(result);
   } catch (err) {
     next(err);
@@ -76,7 +84,7 @@ export async function getRideRequestPoolMatesHandler(
       return;
     }
 
-    const result = await getRideRequestPoolMates(req.user.id, req.params.id);
+    const result = await getRideRequestPoolMates(req.user.id, getRequestIdParam(req));
     res.json(result);
   } catch (err) {
     next(err);
@@ -130,7 +138,7 @@ export async function cancelRideRequestHandler(
       return;
     }
 
-    const request = await cancelRideRequest(req.user.id, req.params.id);
+    const request = await cancelRideRequest(req.user.id, getRequestIdParam(req));
     res.json({ request });
   } catch (err) {
     next(err);
