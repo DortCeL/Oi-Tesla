@@ -55,6 +55,7 @@ export async function createRideRequest(
     type: "SOLO" | "SHARED";
     seatsRequested: 1 | 2;
     paymentMethod: "CASH" | "TESLAPAY";
+    poolGender?: "ANY" | "FEMALE_ONLY" | "MALE_ONLY";
   },
 ) {
   return request(app)
@@ -79,6 +80,7 @@ export async function createAndAcceptRideRequest(
     type: "SOLO" | "SHARED";
     seatsRequested: 1 | 2;
     paymentMethod: "CASH" | "TESLAPAY";
+    poolGender?: "ANY" | "FEMALE_ONLY" | "MALE_ONLY";
   },
 ) {
   const book = await createRideRequest(passengerToken, body);

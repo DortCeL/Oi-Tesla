@@ -192,6 +192,7 @@ export default function DriverHome() {
           pickupZoneId: stack.pickupZone.id,
           destinationZoneId: stack.destinationZone.id,
           type: stack.type,
+          stackKey: stack.key,
         }),
       });
       if (!res.ok) {
@@ -488,6 +489,13 @@ export default function DriverHome() {
                   stack.waitingCount > stack.acceptCount
                     ? stack.waitingCount - stack.acceptCount
                     : 0;
+                const separatePool = stacks.some(
+                  (other) =>
+                    other.key !== stack.key &&
+                    other.pickupZone.id === stack.pickupZone.id &&
+                    other.destinationZone.id === stack.destinationZone.id &&
+                    other.type === stack.type,
+                );
                 return (
                   <li key={stack.key} className="card">
                     <div className="flex items-start justify-between gap-3">
@@ -502,6 +510,12 @@ export default function DriverHome() {
                           {stack.capacity} seats
                           {overflow > 0 ? ` · +${overflow} wait for next car` : ""}
                         </p>
+                        {separatePool ? (
+                          <p className="mt-1 text-sm text-gray-500">
+                            Separate pool. These passengers stay together and are not mixed
+                            with the other group on this route.
+                          </p>
+                        ) : null}
                       </div>
                       <span className="shrink-0 rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-bold text-white">
                         {formatRideType(stack.type)}

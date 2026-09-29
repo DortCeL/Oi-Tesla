@@ -8,7 +8,7 @@ import { apiUrl } from "../lib/api";
 import { getAuth } from "../lib/auth.client";
 import { authFetch, authJson } from "../lib/fetch.client";
 import { formatPaisa, formatRideType } from "../lib/format";
-import type { FareEstimate, RideRequest, RideType, Zone } from "../lib/types";
+import type { FareEstimate, PoolGender, RideRequest, RideType, Zone } from "../lib/types";
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: "Passenger · Oi Tesla" }];
@@ -46,6 +46,7 @@ export default function PassengerHome() {
   const [pickupZoneId, setPickupZoneId] = useState("");
   const [destinationZoneId, setDestinationZoneId] = useState("");
   const [type, setType] = useState<RideType>("SHARED");
+  const [poolGender, setPoolGender] = useState<PoolGender>("ANY");
   const [seatsRequested, setSeatsRequested] = useState<1 | 2>(1);
   const [paymentMethod, setPaymentMethod] = useState<"CASH" | "TESLAPAY">("CASH");
   const [soloFare, setSoloFare] = useState<FareEstimate | null>(null);
@@ -144,6 +145,7 @@ export default function PassengerHome() {
           type,
           seatsRequested,
           paymentMethod,
+          ...(type === "SHARED" ? { poolGender } : {}),
         }),
       });
       if (!res.ok) {
@@ -203,6 +205,24 @@ export default function PassengerHome() {
               { value: "SHARED", label: "Shared" },
             ]}
           />
+
+          {type === "SHARED" ? (
+            <div>
+              <ChoiceTabs
+                label="Share with"
+                value={poolGender}
+                onChange={(next) => setPoolGender(next as PoolGender)}
+                options={[
+                  { value: "ANY", label: "Anyone" },
+                  { value: "FEMALE_ONLY", label: "Women only" },
+                  { value: "MALE_ONLY", label: "Men only" },
+                ]}
+              />
+              <p className="mt-1.5 text-xs text-gray-500">
+                Women only rides with women. Men only rides with men. Anyone can share with either.
+              </p>
+            </div>
+          ) : null}
 
           <ChoiceTabs
             label="Seats"
