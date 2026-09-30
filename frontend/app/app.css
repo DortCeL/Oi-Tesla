@@ -260,22 +260,56 @@ body {
   }
 }
 
+/* —— Public shell (entry, auth, map) —— */
+
+.public-page {
+  @apply flex min-h-full flex-col bg-[var(--color-page)];
+}
+
+.public-topbar {
+  @apply sticky top-0 z-20 border-b border-gray-200/80 bg-white/95 shadow-sm backdrop-blur-sm;
+}
+
+.public-topbar-inner {
+  @apply mx-auto grid w-full max-w-lg grid-cols-[1fr_auto_1fr] items-center px-4 py-3;
+}
+
+.public-topbar-side {
+  @apply min-w-0;
+}
+
+.public-topbar-side-end {
+  @apply flex justify-end;
+}
+
+.public-topbar-brand {
+  @apply inline-flex items-center justify-center gap-2 text-lg font-bold tracking-tight text-gray-900 transition hover:text-emerald-800;
+}
+
+.public-topbar-mark {
+  @apply text-xl leading-none;
+}
+
+.public-topbar-action {
+  @apply rounded-lg px-3 py-1.5 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 hover:text-emerald-900;
+}
+
+.public-page-body {
+  @apply mx-auto w-full max-w-lg flex-1 px-4 pb-10 pt-8;
+}
+
 /* —— Auth / entry —— */
 
 .auth-page {
-  @apply mx-auto flex min-h-full max-w-lg flex-col justify-center px-4 py-10;
+  @apply flex flex-col justify-center;
 }
 
 .auth-shell {
   @apply overflow-hidden rounded-3xl border border-gray-200/80 bg-white shadow-lg shadow-emerald-900/5;
 }
 
-.auth-home-link {
-  @apply inline-flex px-6 pt-6 text-sm font-medium text-emerald-700 transition hover:text-emerald-900;
-}
-
 .auth-shell-header {
-  @apply border-b border-gray-100 px-6 pb-5 pt-2 text-center;
+  @apply border-b border-gray-100 px-6 pb-5 pt-6 text-center;
 }
 
 .auth-brand-mark {
@@ -375,27 +409,23 @@ body {
 }
 
 .entry-page {
-  @apply mx-auto min-h-full max-w-2xl px-4 py-10;
+  @apply flex flex-col justify-center;
 }
 
 .entry-hero {
   @apply rounded-3xl border border-emerald-200/80 bg-gradient-to-br from-emerald-600 via-emerald-600 to-teal-700 px-6 py-10 text-center text-white shadow-lg shadow-emerald-900/20;
 }
 
-.entry-hero-mark {
-  @apply text-5xl;
-}
-
-.entry-hero-title {
-  @apply mt-4 text-3xl font-bold tracking-tight;
+.entry-hero-kicker {
+  @apply text-sm font-semibold uppercase tracking-[0.2em] text-emerald-100;
 }
 
 .entry-hero-tagline {
-  @apply mx-auto mt-3 max-w-sm text-base leading-relaxed text-emerald-50/95;
+  @apply mx-auto mt-4 max-w-md text-2xl font-bold leading-snug text-white;
 }
 
 .entry-role-grid {
-  @apply mt-8 grid gap-4 sm:grid-cols-2;
+  @apply mt-8 grid gap-4;
 }
 
 .role-card {
@@ -428,4 +458,56 @@ body {
 
 .entry-map-link {
   @apply mt-8 block text-center text-sm font-medium text-emerald-700 hover:text-emerald-900 hover:underline;
+}
+
+.map-page {
+  @apply flex flex-col;
+}
+
+.map-back-link {
+  @apply mb-5 inline-flex items-center rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-900;
+}
+
+.map-card {
+  @apply overflow-hidden rounded-3xl border border-gray-200/80 bg-white shadow-lg shadow-emerald-900/5;
+}
+
+.map-card-header {
+  @apply border-b border-gray-100 bg-gradient-to-br from-slate-50 to-white px-6 py-5;
+}
+
+.map-card-kicker {
+  @apply text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700;
+}
+
+.map-card-title {
+  @apply mt-1 text-2xl font-bold tracking-tight text-gray-900;
+}
+
+.map-card-desc {
+  @apply mt-2 max-w-xl text-sm leading-relaxed text-gray-600;
+}
+
+.map-card-legend {
+  @apply flex flex-wrap gap-4 border-b border-gray-100 px-6 py-3 text-xs font-medium text-gray-600;
+}
+
+.map-legend-item {
+  @apply inline-flex items-center gap-2;
+}
+
+.map-legend-dot {
+  @apply h-2.5 w-2.5 rounded-full;
+}
+
+.map-legend-dot-hub {
+  @apply border-2 border-dashed border-slate-400 bg-transparent;
+}
+
+.map-legend-dot-node {
+  @apply bg-slate-900;
+}
+
+.map-card-body {
+  @apply p-4 sm:p-6;
 }

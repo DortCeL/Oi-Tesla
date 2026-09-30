@@ -1,5 +1,6 @@
 import { Link, redirect } from "react-router";
 import type { Route } from "./+types/home";
+import { PublicPage } from "../components/auth/PublicPage";
 import { RoleCard } from "../components/auth/RoleCard";
 import { getAuth } from "../lib/auth.client";
 
@@ -20,12 +21,9 @@ export async function clientLoader() {
 
 export default function Home() {
   return (
-    <main className="entry-page flex min-h-[85vh] flex-col justify-center">
+    <PublicPage className="entry-page">
       <header className="entry-hero">
-        <p className="entry-hero-mark" aria-hidden>
-          🛺
-        </p>
-        <h1 className="entry-hero-title">Oi Tesla</h1>
+        <p className="entry-hero-kicker">Tesla pooling across Dhaka</p>
         <p className="entry-hero-tagline">
           Share a seat. Split the fare. Survive Dhaka traffic.
         </p>
@@ -53,6 +51,6 @@ export default function Home() {
       <Link to="/map" className="entry-map-link">
         View zone roadmap →
       </Link>
-    </main>
+    </PublicPage>
   );
 }

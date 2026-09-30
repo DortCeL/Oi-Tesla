@@ -27,6 +27,7 @@ export async function clientAction({ request }: Route.ClientActionArgs) {
     name: String(form.get("name") ?? "").trim(),
     email: String(form.get("email") ?? "").trim(),
     phone: String(form.get("phone") ?? "").trim(),
+    nid: String(form.get("nid") ?? "").trim(),
     password: String(form.get("password") ?? ""),
     gender: String(form.get("gender") ?? "MALE"),
     tesla: {
@@ -35,8 +36,11 @@ export async function clientAction({ request }: Route.ClientActionArgs) {
     },
   };
 
-  if (!body.name || !body.email || !body.phone || !body.password) {
+  if (!body.name || !body.email || !body.phone || !body.nid || !body.password) {
     return { error: "Please fill in all required fields" };
+  }
+  if (!/^\d{10}$|^\d{13}$|^\d{17}$/.test(body.nid)) {
+    return { error: "NID must be 10, 13, or 17 digits" };
   }
   if (body.password.length < 8) {
     return { error: "Password must be at least 8 characters" };
@@ -140,7 +144,23 @@ export default function SignupDriver() {
           </div>
         </FormField>
 
-        <p className="form-section-title pt-2">Security</p>
+        <p className="form-section-title pt-2">Security & verification</p>
+
+        <FormField
+          label="National ID (NID)"
+          htmlFor="nid"
+          hint="10, 13, or 17 digits. Stored for legal identification only."
+        >
+          <input
+            id="nid"
+            name="nid"
+            inputMode="numeric"
+            pattern="\d{10}|\d{13}|\d{17}"
+            required
+            autoComplete="off"
+            className="input"
+          />
+        </FormField>
 
         <FormField label="Password" htmlFor="password" hint="At least 8 characters.">
           <input

@@ -1,9 +1,11 @@
 import { z } from "zod";
+import { nidSchema } from "./nid.js";
 
 export const driverRegisterSchema = z.object({
   name: z.string().trim().min(2).max(100),
   email: z.string().trim().email().toLowerCase(),
   phone: z.string().trim().min(10).max(20),
+  nid: nidSchema,
   password: z.string().min(8).max(128),
   gender: z.enum(["MALE", "FEMALE"]),
   tesla: z.object({

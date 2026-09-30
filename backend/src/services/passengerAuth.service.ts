@@ -15,11 +15,13 @@ const passengerInclude = {
 
 export async function registerPassenger(input: PassengerRegisterInput) {
   const existing = await prisma.user.findFirst({
-    where: { OR: [{ email: input.email }, { phone: input.phone }] },
+    where: {
+      OR: [{ email: input.email }, { phone: input.phone }, { nid: input.nid }],
+    },
   });
 
   if (existing) {
-    throw new AppError(409, "Email or phone already registered");
+    throw new AppError(409, "Email, phone, or NID already registered");
   }
 
   const passwordHash = await hashPassword(input.password);
@@ -29,6 +31,7 @@ export async function registerPassenger(input: PassengerRegisterInput) {
       name: input.name,
       email: input.email,
       phone: input.phone,
+      nid: input.nid,
       passwordHash,
       role: Role.PASSENGER,
       gender: input.gender,

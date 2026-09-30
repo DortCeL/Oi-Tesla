@@ -62,6 +62,7 @@ describe("passenger profile fields", () => {
       name: "Blank Profile",
       email: blankEmail,
       phone: "+8801799000099",
+      nid: "9876543210",
       password: "password123",
       gender: "FEMALE",
     });
@@ -69,7 +70,7 @@ describe("passenger profile fields", () => {
     expect(registered.status).toBe(201);
     expect(registered.body.user.name).toBe("Blank Profile");
     expect(registered.body.user.gender).toBe("FEMALE");
-    expect(JSON.stringify(registered.body)).not.toMatch(/occupation|affiliation|hobbies/i);
+    expect(JSON.stringify(registered.body)).not.toMatch(/occupation|affiliation|hobbies|nid/i);
   });
 
   it("shows pool mates name, gender, and destination only", async () => {
@@ -82,6 +83,7 @@ describe("passenger profile fields", () => {
       name: "Blank Profile",
       email: blankEmail,
       phone: "+8801799000099",
+      nid: "9876543210",
       password: "password123",
       gender: "FEMALE",
     });

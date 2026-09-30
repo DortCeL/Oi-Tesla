@@ -1,4 +1,4 @@
-import { Link } from "react-router";
+import { PublicPage } from "./PublicPage";
 
 type AuthShellProps = {
   title: string;
@@ -10,12 +10,8 @@ type AuthShellProps = {
 
 export function AuthShell({ title, subtitle, badge, children, footer }: AuthShellProps) {
   return (
-    <main className="auth-page">
+    <PublicPage className="auth-page">
       <div className="auth-shell">
-        <Link to="/" className="auth-home-link">
-          ← Back to home
-        </Link>
-
         <div className="auth-shell-header">
           <p className="auth-brand-mark" aria-hidden>
             🛺
@@ -29,6 +25,6 @@ export function AuthShell({ title, subtitle, badge, children, footer }: AuthShel
 
         {footer ? <div className="auth-shell-footer">{footer}</div> : null}
       </div>
-    </main>
+    </PublicPage>
   );
 }
