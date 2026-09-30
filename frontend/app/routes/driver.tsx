@@ -7,8 +7,8 @@ import { PassengerList } from "../components/PassengerList";
 import { SeatMeter } from "../components/SeatMeter";
 import { StatusBadge } from "../components/StatusBadge";
 import { driverNav } from "../components/TopNav";
-import { apiUrl } from "../lib/api";
 import { getAuth } from "../lib/auth.client";
+import { loadZones } from "../lib/zones";
 import { authFetch, authJson } from "../lib/fetch.client";
 import { formatPaisa, formatRideType } from "../lib/format";
 import { describePoolFill } from "../lib/rideCopy";
@@ -56,23 +56,30 @@ export async function clientLoader() {
     throw redirect("/login");
   }
 
-  const zonesRes = await fetch(apiUrl("/zones"));
-  const zonesData = (await zonesRes.json()) as { zones: Zone[] };
+  const [zones, session] = await Promise.all([
+    loadZones(),
+    (async () => {
+      try {
+        const [me, list] = await Promise.all([
+          authJson<{ user: DriverProfile }>("/auth/driver/me"),
+          authJson<{ rides: DriverRide[] }>("/driver/rides"),
+        ]);
+        return {
+          profile: me.user,
+          rides: list.rides.filter(isActiveRide),
+        };
+      } catch (err) {
+        if (err instanceof Response) throw err;
+        return { profile: { driver: null } satisfies DriverProfile, rides: [] as DriverRide[] };
+      }
+    })(),
+  ]);
 
-  let profile: DriverProfile = { driver: null };
-  let rides: DriverRide[] = [];
-  try {
-    const me = await authJson<{ user: DriverProfile }>("/auth/driver/me");
-    profile = me.user;
-    const list = await authJson<{ rides: DriverRide[] }>("/driver/rides");
-    rides = list.rides.filter(isActiveRide);
-  } catch (err) {
-    if (err instanceof Response) throw err;
-  }
+  const { profile, rides } = session;
 
   return {
     name: auth.name,
-    zones: zonesData.zones,
+    zones,
     isOnline: profile.driver?.isOnline ?? false,
     offlineQueued: profile.driver?.offlineQueued ?? false,
     activeZoneIds: profile.driver?.activeZoneIds ?? [],

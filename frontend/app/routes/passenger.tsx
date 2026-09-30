@@ -4,9 +4,10 @@ import type { Route } from "./+types/passenger";
 import { ChoiceTabs } from "../components/ChoiceTabs";
 import { passengerNav } from "../components/TopNav";
 import { ZoneSelect } from "../components/ZoneSelect";
-import { apiUrl } from "../lib/api";
 import { getAuth } from "../lib/auth.client";
 import { authFetch, authJson } from "../lib/fetch.client";
+import { loadPassengerMe } from "../lib/passengerSession";
+import { loadZones } from "../lib/zones";
 import { formatPaisa } from "../lib/format";
 import type { FareEstimate, PoolGender, RideRequest, RideType, Zone } from "../lib/types";
 
@@ -20,27 +21,29 @@ export async function clientLoader() {
     throw redirect("/login");
   }
 
-  const zonesRes = await fetch(apiUrl("/zones"));
-  const zonesData = (await zonesRes.json()) as { zones: Zone[] };
+  const [zones, me, mineResult] = await Promise.all([
+    loadZones(),
+    loadPassengerMe(auth.token),
+    authJson<{ requests: RideRequest[] }>("/ride-requests/mine").then(
+      (mine) => ({ ok: true as const, mine }),
+      (err: unknown) => {
+        if (err instanceof Response) throw err;
+        return { ok: false as const };
+      },
+    ),
+  ]);
 
-  try {
-    const mine = await authJson<{ requests: RideRequest[] }>("/ride-requests/mine");
-    const active = mine.requests[0];
+  if (mineResult.ok) {
+    const active = mineResult.mine.requests[0];
     if (active) {
       if (active.status === "REQUESTED" && !active.rideId) {
         throw redirect(`/passenger/searching/${active.id}`);
       }
       throw redirect(`/passenger/ride/${active.id}`);
     }
-  } catch (err) {
-    if (err instanceof Response) throw err;
   }
 
-  const me = await authJson<{ user: { gender: "MALE" | "FEMALE" } }>(
-    "/auth/passenger/me",
-  );
-
-  return { name: auth.name, zones: zonesData.zones, gender: me.user.gender };
+  return { name: auth.name, zones, gender: me.user.gender };
 }
 
 export default function PassengerHome() {

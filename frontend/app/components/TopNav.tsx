@@ -48,6 +48,7 @@ export function TopNav({ name, emoji, homeTo, items }: TopNavProps) {
             key={item.to}
             to={item.to}
             end={item.end}
+            prefetch="render"
             className={({ isActive }) =>
               [
                 "whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition",

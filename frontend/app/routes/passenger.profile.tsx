@@ -2,15 +2,8 @@ import { redirect, useLoaderData } from "react-router";
 import type { Route } from "./+types/passenger.profile";
 import { passengerNav } from "../components/TopNav";
 import { getAuth } from "../lib/auth.client";
-import { authJson } from "../lib/fetch.client";
 import { formatGender } from "../lib/format";
-
-type PassengerProfile = {
-  name: string;
-  email: string;
-  phone: string;
-  gender: string;
-};
+import { loadPassengerMe } from "../lib/passengerSession";
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: "Profile · Oi Tesla" }];
@@ -22,7 +15,7 @@ export async function clientLoader() {
     throw redirect("/login");
   }
 
-  const { user } = await authJson<{ user: PassengerProfile }>("/auth/passenger/me");
+  const { user } = await loadPassengerMe(auth.token);
   return { name: auth.name, user };
 }
 
