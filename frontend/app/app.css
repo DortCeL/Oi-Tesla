@@ -259,3 +259,173 @@ body {
     box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
   }
 }
+
+/* —— Auth / entry —— */
+
+.auth-page {
+  @apply mx-auto flex min-h-full max-w-lg flex-col justify-center px-4 py-10;
+}
+
+.auth-shell {
+  @apply overflow-hidden rounded-3xl border border-gray-200/80 bg-white shadow-lg shadow-emerald-900/5;
+}
+
+.auth-home-link {
+  @apply inline-flex px-6 pt-6 text-sm font-medium text-emerald-700 transition hover:text-emerald-900;
+}
+
+.auth-shell-header {
+  @apply border-b border-gray-100 px-6 pb-5 pt-2 text-center;
+}
+
+.auth-brand-mark {
+  @apply text-4xl;
+}
+
+.auth-badge {
+  @apply mt-3 inline-block rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-800;
+}
+
+.auth-title {
+  @apply mt-3 text-2xl font-bold tracking-tight text-gray-900;
+}
+
+.auth-subtitle {
+  @apply mt-1.5 text-sm leading-relaxed text-gray-600;
+}
+
+.auth-shell-body {
+  @apply px-6 py-6;
+}
+
+.auth-shell-footer {
+  @apply border-t border-gray-100 bg-gray-50/80 px-6 py-4;
+}
+
+.form-field {
+  @apply space-y-1.5;
+}
+
+.form-label {
+  @apply block text-sm font-medium text-gray-700;
+}
+
+.form-hint {
+  @apply text-xs text-gray-500;
+}
+
+.form-section {
+  @apply space-y-4;
+}
+
+.form-section-title {
+  @apply text-xs font-semibold uppercase tracking-wider text-gray-500;
+}
+
+.form-error {
+  @apply rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700;
+}
+
+.auth-role-tabs {
+  @apply grid grid-cols-2 gap-2 rounded-2xl bg-gray-100 p-1;
+}
+
+.auth-role-tab {
+  @apply rounded-xl px-3 py-2.5 text-sm font-semibold text-gray-600 transition;
+}
+
+.auth-role-tab-selected {
+  @apply bg-white text-emerald-800 shadow-sm ring-1 ring-gray-200/80;
+}
+
+.auth-footer-links {
+  @apply flex flex-col gap-2 text-center text-sm text-gray-600;
+}
+
+.auth-footer-link-row {
+  @apply flex flex-wrap items-center justify-center gap-2;
+}
+
+.auth-footer-link {
+  @apply font-semibold text-emerald-700 hover:text-emerald-900 hover:underline;
+}
+
+.auth-alt-signup {
+  @apply grid grid-cols-2 gap-2;
+}
+
+.auth-alt-signup-link {
+  @apply rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-center text-sm font-medium text-gray-800 transition hover:border-emerald-300 hover:bg-emerald-50;
+}
+
+.auth-alt-signup-link-active {
+  @apply border-emerald-400 bg-emerald-50 text-emerald-900 ring-1 ring-emerald-200;
+}
+
+.gender-options {
+  @apply flex gap-3;
+}
+
+.gender-option {
+  @apply flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm font-medium text-gray-700 transition has-checked:border-emerald-500 has-checked:bg-emerald-50 has-checked:text-emerald-900 has-checked:ring-2 has-checked:ring-emerald-500/20;
+}
+
+.gender-option input {
+  @apply h-4 w-4 accent-emerald-600;
+}
+
+.entry-page {
+  @apply mx-auto min-h-full max-w-2xl px-4 py-10;
+}
+
+.entry-hero {
+  @apply rounded-3xl border border-emerald-200/80 bg-gradient-to-br from-emerald-600 via-emerald-600 to-teal-700 px-6 py-10 text-center text-white shadow-lg shadow-emerald-900/20;
+}
+
+.entry-hero-mark {
+  @apply text-5xl;
+}
+
+.entry-hero-title {
+  @apply mt-4 text-3xl font-bold tracking-tight;
+}
+
+.entry-hero-tagline {
+  @apply mx-auto mt-3 max-w-sm text-base leading-relaxed text-emerald-50/95;
+}
+
+.entry-role-grid {
+  @apply mt-8 grid gap-4 sm:grid-cols-2;
+}
+
+.role-card {
+  @apply flex flex-col rounded-2xl border bg-white p-5 shadow-sm transition hover:shadow-md;
+}
+
+.role-card-passenger {
+  @apply border-sky-200 hover:border-sky-300;
+}
+
+.role-card-driver {
+  @apply border-amber-200 hover:border-amber-300;
+}
+
+.role-card-emoji {
+  @apply text-3xl;
+}
+
+.role-card-title {
+  @apply mt-3 text-lg font-bold text-gray-900;
+}
+
+.role-card-desc {
+  @apply mt-1 flex-1 text-sm leading-relaxed text-gray-600;
+}
+
+.role-card-actions {
+  @apply mt-5 flex flex-col gap-2;
+}
+
+.entry-map-link {
+  @apply mt-8 block text-center text-sm font-medium text-emerald-700 hover:text-emerald-900 hover:underline;
+}

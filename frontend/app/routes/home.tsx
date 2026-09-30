@@ -1,5 +1,6 @@
 import { Link, redirect } from "react-router";
 import type { Route } from "./+types/home";
+import { RoleCard } from "../components/auth/RoleCard";
 import { getAuth } from "../lib/auth.client";
 
 export function meta({}: Route.MetaArgs) {
@@ -19,30 +20,39 @@ export async function clientLoader() {
 
 export default function Home() {
   return (
-    <main className="page flex min-h-[80vh] flex-col justify-center">
-      <div className="card text-center">
-        <p className="text-5xl" aria-hidden>
+    <main className="entry-page flex min-h-[85vh] flex-col justify-center">
+      <header className="entry-hero">
+        <p className="entry-hero-mark" aria-hidden>
           🛺
         </p>
-        <h1 className="brand-title mt-4">Oi Tesla</h1>
-        <p className="mt-2 text-gray-600">
+        <h1 className="entry-hero-title">Oi Tesla</h1>
+        <p className="entry-hero-tagline">
           Share a seat. Split the fare. Survive Dhaka traffic.
         </p>
-        <div className="mt-8 flex flex-col gap-3">
-          <Link to="/login" className="btn-primary block text-center">
-            Sign in
-          </Link>
-          <Link to="/signup/passenger" className="btn-secondary block text-center">
-            Passenger signup
-          </Link>
-          <Link to="/signup/driver" className="btn-secondary block text-center">
-            Driver signup 🛺
-          </Link>
-          <Link to="/map" className="text-sm text-emerald-700 hover:underline">
-            View zone roadmap
-          </Link>
-        </div>
+      </header>
+
+      <div className="entry-role-grid">
+        <RoleCard
+          emoji="👤"
+          title="Passenger"
+          description="Book a solo or shared ride across the zone map. Split fares with pool mates on your route."
+          loginTo="/login?role=passenger"
+          signupTo="/signup/passenger"
+          accent="passenger"
+        />
+        <RoleCard
+          emoji="🛺"
+          title="Driver"
+          description="Go online, pick your zones, and accept stacked requests. Earn from every seat you fill."
+          loginTo="/login?role=driver"
+          signupTo="/signup/driver"
+          accent="driver"
+        />
       </div>
+
+      <Link to="/map" className="entry-map-link">
+        View zone roadmap →
+      </Link>
     </main>
   );
 }

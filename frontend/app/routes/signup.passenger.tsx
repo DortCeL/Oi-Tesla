@@ -1,5 +1,7 @@
 import { Form, Link, redirect, useActionData } from "react-router";
 import type { Route } from "./+types/signup.passenger";
+import { AuthShell } from "../components/auth/AuthShell";
+import { FormField } from "../components/auth/FormField";
 import { apiUrl } from "../lib/api";
 import { getAuth, setAuth } from "../lib/auth.client";
 
@@ -56,63 +58,93 @@ export default function SignupPassenger() {
   const actionData = useActionData<typeof clientAction>();
 
   return (
-    <main className="mx-auto max-w-lg p-6 pt-16">
-      <h1 className="mb-2 text-2xl font-bold">Passenger signup</h1>
-      <p className="mb-6 text-sm text-gray-500">
-        Already have an account?{" "}
-        <Link to="/login" className="text-emerald-700">
-          Sign in
-        </Link>
-      </p>
-
-      <Form method="post" className="space-y-3">
-        <input
-          name="name"
-          placeholder="Full name"
-          required
-          className="input"
-        />
-        <input
-          name="email"
-          type="email"
-          placeholder="Email"
-          required
-          className="input"
-        />
-        <input
-          name="phone"
-          placeholder="Phone"
-          required
-          className="input"
-        />
-        <input
-          name="password"
-          type="password"
-          placeholder="Password (min 8)"
-          required
-          minLength={8}
-          className="input"
-        />
-
-        <div className="flex gap-4 text-sm">
-          <label className="flex items-center gap-2">
-            <input type="radio" name="gender" value="MALE" defaultChecked />
-            Male
-          </label>
-          <label className="flex items-center gap-2">
-            <input type="radio" name="gender" value="FEMALE" />
-            Female
-          </label>
+    <AuthShell
+      badge="Passenger"
+      title="Create your account"
+      subtitle="Book solo or shared rides and split the fare with pool mates."
+      footer={
+        <div className="auth-footer-links">
+          <div className="auth-footer-link-row">
+            <span>Already registered?</span>
+            <Link to="/login?role=passenger" className="auth-footer-link">
+              Sign in
+            </Link>
+          </div>
+          <div className="auth-footer-link-row">
+            <span>Driving instead?</span>
+            <Link to="/signup/driver" className="auth-footer-link">
+              Driver signup
+            </Link>
+          </div>
         </div>
+      }
+    >
+      <Form method="post" className="form-section">
+        <p className="form-section-title">About you</p>
+
+        <FormField label="Full name" htmlFor="name">
+          <input id="name" name="name" required autoComplete="name" className="input" />
+        </FormField>
+
+        <FormField label="Email" htmlFor="email">
+          <input
+            id="email"
+            name="email"
+            type="email"
+            required
+            autoComplete="email"
+            className="input"
+          />
+        </FormField>
+
+        <FormField label="Phone" htmlFor="phone" hint="Used for ride updates and sign-in.">
+          <input
+            id="phone"
+            name="phone"
+            type="tel"
+            required
+            autoComplete="tel"
+            className="input"
+          />
+        </FormField>
+
+        <FormField label="Gender" htmlFor="gender-male">
+          <div className="gender-options">
+            <label className="gender-option" htmlFor="gender-male">
+              <input type="radio" id="gender-male" name="gender" value="MALE" defaultChecked />
+              Male
+            </label>
+            <label className="gender-option" htmlFor="gender-female">
+              <input type="radio" id="gender-female" name="gender" value="FEMALE" />
+              Female
+            </label>
+          </div>
+        </FormField>
+
+        <p className="form-section-title pt-2">Security</p>
+
+        <FormField label="Password" htmlFor="password" hint="At least 8 characters.">
+          <input
+            id="password"
+            name="password"
+            type="password"
+            required
+            minLength={8}
+            autoComplete="new-password"
+            className="input"
+          />
+        </FormField>
 
         {actionData?.error ? (
-          <p className="text-sm text-red-600">{actionData.error}</p>
+          <p className="form-error" role="alert">
+            {actionData.error}
+          </p>
         ) : null}
 
         <button type="submit" className="btn-primary w-full">
-          Create account
+          Create passenger account
         </button>
       </Form>
-    </main>
+    </AuthShell>
   );
 }

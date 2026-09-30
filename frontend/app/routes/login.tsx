@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Form, Link, redirect, useActionData } from "react-router";
+import { Form, Link, redirect, useActionData, useSearchParams } from "react-router";
 import type { Route } from "./+types/login";
-import { ChoiceTabs } from "../components/ChoiceTabs";
+import { AuthShell } from "../components/auth/AuthShell";
+import { FormField } from "../components/auth/FormField";
 import { apiUrl } from "../lib/api";
 import { getAuth, setAuth, type AuthRole } from "../lib/auth.client";
 
@@ -53,67 +54,107 @@ export async function clientAction({ request }: Route.ClientActionArgs) {
   throw redirect(user.role === "DRIVER" ? "/driver" : "/passenger");
 }
 
+function initialRole(searchParams: URLSearchParams): AuthRole {
+  const role = searchParams.get("role");
+  if (role === "driver") return "DRIVER";
+  return "PASSENGER";
+}
+
 export default function Login() {
   const actionData = useActionData<typeof clientAction>();
-  const [role, setRole] = useState<AuthRole>("PASSENGER");
+  const [searchParams] = useSearchParams();
+  const [role, setRole] = useState<AuthRole>(() => initialRole(searchParams));
 
   return (
-    <main className="page">
-      <div className="card">
-        <h1 className="brand-title">Sign in</h1>
+    <AuthShell
+      title="Welcome back"
+      subtitle="Sign in to book rides or go online as a driver."
+      footer={
+        <div className="auth-footer-links">
+          <p>New here? Create an account:</p>
+          <div className="auth-alt-signup">
+            <Link
+              to="/signup/passenger"
+              className={`auth-alt-signup-link ${role === "PASSENGER" ? "auth-alt-signup-link-active" : ""}`}
+            >
+              Passenger signup
+            </Link>
+            <Link
+              to="/signup/driver"
+              className={`auth-alt-signup-link ${role === "DRIVER" ? "auth-alt-signup-link-active" : ""}`}
+            >
+              Driver signup
+            </Link>
+          </div>
+        </div>
+      }
+    >
+      <Form method="post" className="form-section">
+        <input type="hidden" name="role" value={role} />
 
-        <Form method="post" className="mt-6 space-y-4">
-          <input type="hidden" name="role" value={role} />
-          <ChoiceTabs
-            label="I am a"
-            value={role}
-            onChange={(v) => setRole(v as AuthRole)}
-            options={[
-              { value: "PASSENGER", label: "Passenger" },
-              { value: "DRIVER", label: "Driver 🛺" },
-            ]}
-          />
+        <div className="form-field">
+          <p className="form-label" id="login-role-label">
+            I am a
+          </p>
+          <div
+            className="auth-role-tabs"
+            role="tablist"
+            aria-labelledby="login-role-label"
+          >
+            <button
+              id="login-role-passenger"
+              type="button"
+              role="tab"
+              aria-selected={role === "PASSENGER"}
+              className={`auth-role-tab ${role === "PASSENGER" ? "auth-role-tab-selected" : ""}`}
+              onClick={() => setRole("PASSENGER")}
+            >
+              👤 Passenger
+            </button>
+            <button
+              id="login-role-driver"
+              type="button"
+              role="tab"
+              aria-selected={role === "DRIVER"}
+              className={`auth-role-tab ${role === "DRIVER" ? "auth-role-tab-selected" : ""}`}
+              onClick={() => setRole("DRIVER")}
+            >
+              🛺 Driver
+            </button>
+          </div>
+        </div>
 
+        <FormField label="Email or phone" htmlFor="emailOrPhone">
           <input
+            id="emailOrPhone"
             name="emailOrPhone"
-            placeholder="Email or phone"
             required
             autoComplete="username"
             className="input"
           />
+        </FormField>
+
+        <FormField label="Password" htmlFor="password">
           <input
+            id="password"
             name="password"
             type="password"
-            placeholder="Password"
             required
             autoComplete="current-password"
             className="input"
           />
+        </FormField>
 
-          {actionData?.error ? (
-            <p className="text-sm text-red-600">{actionData.error}</p>
-          ) : null}
+        {actionData?.error ? (
+          <p className="form-error" role="alert">
+            {actionData.error}
+          </p>
+        ) : null}
 
-          <button type="submit" className="btn-primary w-full">
-            Sign in
-          </button>
-        </Form>
-
-        <p className="mt-6 text-sm text-gray-500">
-          No account?{" "}
-          <Link to="/signup/passenger" className="text-emerald-700">
-            Passenger
-          </Link>{" "}
-          or{" "}
-          <Link to="/signup/driver" className="text-emerald-700">
-            Driver
-          </Link>{" "}
-          signup
-        </p>
-        <p className="mt-2 text-sm text-gray-400">
-          Demo: nusrat@oitesla.test or jashim@oitesla.test — password123
-        </p>
-      </div>
-    </main>
+        <button type="submit" className="btn-primary w-full">
+          Sign in as {role === "DRIVER" ? "driver" : "passenger"}
+        </button>
+      </Form>
+    </AuthShell>
   );
 }
