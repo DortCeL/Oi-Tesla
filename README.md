@@ -24,6 +24,18 @@ Real maps, live traffic, and a payment gateway are out of scope. The engineering
 
 ## What is built
 
+| Home | Login | Driver signup |
+| --- | --- | --- |
+| ![Home. Passenger and driver each have sign in and create account.](docs/home.png) | ![Login. Same page for both roles.](docs/login.png) | ![Driver signup. NID is required, and the Tesla gets a name and a seat count.](docs/driver-signup.png) |
+
+| Offline | Profile | Zone roadmap |
+| --- | --- | --- |
+| ![Jashim's dashboard while offline. No ride until he goes online and accepts one.](docs/driver-offline.png) | ![Driver profile. Name, phone, Tesla, capacity. NID is not shown.](docs/driver-profile.png) | ![Zone roadmap. Fares follow these paths, not live GPS.](docs/zone-roadmap.png) |
+
+| One seat left | Pool full |
+| --- | --- |
+| ![Shared ride still open. Bullet has one seat left. Shirin is on the booking form. Nusrat and Rafiq can still cancel.](docs/pool-waiting.png) | ![Pool locked at 3/3. Jashim is heading to Banani. Each passenger sees their own fare, and pool mates without phone numbers.](docs/ride-matched.png) |
+
 **Passenger**
 
 - Sign up and sign in with email or phone. National ID is required at signup and stored for accountability. It is never shown back in the API or the UI.
